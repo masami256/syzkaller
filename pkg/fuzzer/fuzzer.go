@@ -280,6 +280,17 @@ func (fuzzer *Fuzzer) genFuzz() *queue.Request {
 	if req == nil {
 		req = genProgRequest(fuzzer, rnd)
 	}
+
+	// Assign energy to the generated request
+	energy := assignEnergy(req)
+	for i := 0; i < energy; i++ {
+		mutatedReq := mutateProgRequest(fuzzer, rnd)
+		if mutatedReq == nil {
+			mutatedReq = genProgRequest(fuzzer, rnd)
+		}
+		fuzzer.prepare(mutatedReq, 0, 0)
+	}
+
 	if fuzzer.Config.Collide && rnd.Intn(3) == 0 {
 		req = &queue.Request{
 			Prog: randomCollide(req.Prog, rnd),
@@ -357,7 +368,14 @@ func (fuzzer *Fuzzer) AddCandidates(candidates []Candidate) {
 			Stat:      fuzzer.statExecCandidate,
 			Important: true,
 		}
-		fuzzer.enqueue(fuzzer.candidateQueue, req, candidate.Flags|progCandidate, 0)
+		energy := assignEnergy(req)
+		for i := 0; i < energy; i++ {
+			mutatedReq := mutateProgRequest(fuzzer, fuzzer.rnd)
+			if mutatedReq == nil {
+				mutatedReq = genProgRequest(fuzzer, fuzzer.rnd)
+			}
+			fuzzer.enqueue(fuzzer.candidateQueue, mutatedReq, candidate.Flags|progCandidate, 0)
+		}
 	}
 }
 
@@ -473,4 +491,9 @@ func DefaultExecOpts(cfg *mgrconfig.Config, features flatrpc.Feature, debug bool
 		ExecFlags:  exec,
 		SandboxArg: cfg.SandboxArg,
 	}
+}
+
+func assignEnergy(req *queue.Request) int {
+	// Assign energy to the generated request.
+	return 10
 }
