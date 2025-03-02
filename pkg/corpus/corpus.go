@@ -125,6 +125,7 @@ type NewItemEvent struct {
 }
 
 func (corpus *Corpus) Save(inp NewInput) {
+	// DGF: Merge Coverages
 	progData := inp.Prog.Serialize()
 	sig := hash.String(progData)
 
@@ -189,6 +190,7 @@ func (corpus *Corpus) Save(inp NewInput) {
 }
 
 func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) {
+	// DGF: Check if the coverDelta matches any of the focus areas
 	for _, area := range corpus.focusAreas {
 		matches := false
 		for _, pc := range coverDelta {

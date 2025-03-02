@@ -207,6 +207,9 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
 			})
 		}
 	}
+
+	diff := info.cover.Diff(info.rawCover)
+	job.fuzzer.Logf(0, "NewDiff 0x%x", diff)
 	job.fuzzer.Logf(2, "added new input for %v to the corpus: %s", callName, p)
 	input := corpus.NewInput{
 		Prog:     p,
@@ -215,6 +218,7 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
 		Cover:    info.cover.Serialize(),
 		RawCover: info.rawCover,
 	}
+	// DGF: Merge Coverages
 	job.fuzzer.Config.Corpus.Save(input)
 }
 

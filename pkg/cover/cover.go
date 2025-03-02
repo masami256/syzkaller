@@ -49,3 +49,18 @@ func (cov *Cover) Serialize() []uint64 {
 	}
 	return res
 }
+
+// Diff calculates the difference between Cover and a slice of uint64.
+func (c Cover) Diff(other []uint64) []uint64 {
+	var diff []uint64
+	otherSet := make(map[uint64]struct{})
+	for _, pc := range other {
+		otherSet[pc] = struct{}{}
+	}
+	for pc := range c {
+		if _, exists := otherSet[pc]; !exists {
+			diff = append(diff, pc)
+		}
+	}
+	return diff
+}

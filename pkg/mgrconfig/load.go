@@ -201,6 +201,10 @@ func Complete(cfg *Config) error {
 	if err := cfg.completeFocusAreas(); err != nil {
 		return err
 	}
+
+	if err := cfg.completeDirectedGreyboxFuzzing(); err != nil {
+		return err
+	}
 	cfg.initTimeouts()
 	cfg.VMLess = cfg.Type == "none"
 	return nil
@@ -271,6 +275,10 @@ func checkNonEmpty(fields ...string) error {
 
 func (cov *CovFilterCfg) Empty() bool {
 	return len(cov.Functions)+len(cov.Files)+len(cov.RawPCs) == 0
+}
+
+func (cov *CovFilterCfg) EmptyDFG() bool {
+	return len(cov.TargetFuncsion) == 0
 }
 
 func (cfg *Config) CompleteKernelDirs() {
@@ -374,6 +382,35 @@ func (cfg *Config) completeFocusAreas() error {
 		}
 		cfg.CovFilter = CovFilterCfg{}
 	}
+	return nil
+}
+
+func (cfg *Config) completeDirectedGreyboxFuzzing() error {
+	if len(cfg.Experimental.DirectedGreyboxFuzzing.FunctionName) == 0 {
+		return nil
+	}
+
+	info, err := os.Stat(cfg.Experimental.DirectedGreyboxFuzzing.GraphFileName)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("graph file does not exist: %v", cfg.Experimental.DirectedGreyboxFuzzing.GraphFileName)
+	}
+
+	if info.IsDir() {
+		return fmt.Errorf("graph file is a directory: %v", cfg.Experimental.DirectedGreyboxFuzzing.GraphFileName)
+	}
+
+	functions := []string{cfg.Experimental.DirectedGreyboxFuzzing.FunctionName}
+	cfg.CovFilter.Functions = functions
+
+	cfg.Experimental.FocusAreas = []FocusArea{
+		{
+			Name:   "filtered",
+			Filter: cfg.CovFilter,
+			Weight: 1.0,
+		},
+	}
+	cfg.CovFilter = CovFilterCfg{}
+
 	return nil
 }
 

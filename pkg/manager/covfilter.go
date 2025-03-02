@@ -19,7 +19,7 @@ import (
 
 func CoverageFilter(source *ReportGeneratorWrapper, covCfg mgrconfig.CovFilterCfg,
 	strict bool) (map[uint64]struct{}, error) {
-	if covCfg.Empty() {
+	if covCfg.Empty() && covCfg.EmptyDFG() {
 		return nil, nil
 	}
 	rg, err := source.Get()
@@ -32,6 +32,7 @@ func CoverageFilter(source *ReportGeneratorWrapper, covCfg mgrconfig.CovFilterCf
 			apply(&sym.ObjectUnit)
 		}
 	}
+
 	if err := covFilterAddFilter(pcs, covCfg.Functions, foreachSymbol, strict); err != nil {
 		return nil, err
 	}
@@ -46,6 +47,12 @@ func CoverageFilter(source *ReportGeneratorWrapper, covCfg mgrconfig.CovFilterCf
 	if err := covFilterAddRawPCs(pcs, covCfg.RawPCs); err != nil {
 		return nil, err
 	}
+
+	// DGF
+	if err := covFilterAddDirectedPcs(pcs, covCfg.Functions, foreachSymbol, strict); err != nil {
+		return nil, err
+	}
+
 	// Note that pcs may include both comparison and block/edge coverage callbacks.
 	return pcs, nil
 }
@@ -119,6 +126,11 @@ func covFilterAddRawPCs(pcs map[uint64]struct{}, rawPCsFiles []string) error {
 	return nil
 }
 
+func covFilterAddDirectedPcs(pcs map[uint64]struct{}, filters []string, foreach func(func(*backend.ObjectUnit)),
+	strict bool) error {
+	return covFilterAddFilter(pcs, filters, foreach, strict)
+}
+
 func compileRegexps(regexpStrings []string) ([]*regexp.Regexp, error) {
 	var regexps []*regexp.Regexp
 	for _, rs := range regexpStrings {
@@ -156,7 +168,7 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 			CoverPCs: covPCs,
 			Weight:   area.Weight,
 		})
-		if area.Filter.Empty() {
+		if area.Filter.Empty() && area.Filter.EmptyDFG() {
 			// An empty cover filter indicates that the user is interested in all the coverage.
 			needExecutorFilter = false
 		}

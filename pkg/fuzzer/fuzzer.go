@@ -375,7 +375,7 @@ func (fuzzer *Fuzzer) AddCandidates(candidates []Candidate) {
 			if mutatedReq == nil {
 				mutatedReq = genProgRequest(fuzzer, fuzzer.rnd)
 			}
-			fuzzer.Logf(0, "AddCandidates(): Mutated request %d/%d: %s", i+1, energy, mutatedReq.Prog)
+			//fuzzer.Logf(0, "AddCandidates(): Mutated request %d/%d: %s", i+1, energy, mutatedReq.Prog)
 			fuzzer.enqueue(fuzzer.candidateQueue, mutatedReq, candidate.Flags|progCandidate, 0)
 		}
 	}
