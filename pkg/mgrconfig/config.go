@@ -298,4 +298,5 @@ type CovFilterCfg struct {
 	Functions      []string `json:"functions,omitempty"`
 	RawPCs         []string `json:"pcs,omitempty"`
 	TargetFuncsion string
+	CallGraph      *CallGraph
 }

@@ -277,6 +277,7 @@ func (cov *CovFilterCfg) Empty() bool {
 	return len(cov.Functions)+len(cov.Files)+len(cov.RawPCs) == 0
 }
 
+// DGF
 func (cov *CovFilterCfg) EmptyDFG() bool {
 	return len(cov.TargetFuncsion) == 0
 }
@@ -385,6 +386,7 @@ func (cfg *Config) completeFocusAreas() error {
 	return nil
 }
 
+// DGF
 func (cfg *Config) completeDirectedGreyboxFuzzing() error {
 	if len(cfg.Experimental.DirectedGreyboxFuzzing.FunctionName) == 0 {
 		return nil
@@ -399,6 +401,9 @@ func (cfg *Config) completeDirectedGreyboxFuzzing() error {
 		return fmt.Errorf("graph file is a directory: %v", cfg.Experimental.DirectedGreyboxFuzzing.GraphFileName)
 	}
 
+	// load the call graph
+	cfg.loadCallGraph()
+
 	functions := []string{cfg.Experimental.DirectedGreyboxFuzzing.FunctionName}
 	cfg.CovFilter.Functions = functions
 
@@ -406,7 +411,7 @@ func (cfg *Config) completeDirectedGreyboxFuzzing() error {
 		{
 			Name:   "filtered",
 			Filter: cfg.CovFilter,
-			Weight: 1.0,
+			Weight: 10.0,
 		},
 	}
 	cfg.CovFilter = CovFilterCfg{}
