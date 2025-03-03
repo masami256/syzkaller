@@ -402,7 +402,10 @@ func (cfg *Config) completeDirectedGreyboxFuzzing() error {
 	}
 
 	// load the call graph
-	cfg.loadCallGraph()
+	callGraph, err := cfg.loadCallGraph()
+	if err != nil {
+		return err
+	}
 
 	functions := []string{cfg.Experimental.DirectedGreyboxFuzzing.FunctionName}
 	cfg.CovFilter.Functions = functions
@@ -415,6 +418,7 @@ func (cfg *Config) completeDirectedGreyboxFuzzing() error {
 		},
 	}
 	cfg.CovFilter = CovFilterCfg{}
+	cfg.CovFilter.CallGraph = callGraph
 
 	return nil
 }
