@@ -55,6 +55,10 @@ func (cfg *Config) loadCallGraph() (*CallGraph, error) {
 	}
 
 	for _, link := range graphData.Links {
+		if link.Source == link.Target {
+			// Skip self edges
+			continue
+		}
 		sourceNode := nodeMap[link.Source]
 		targetNode := nodeMap[link.Target]
 		g.SetEdge(g.NewEdge(sourceNode, targetNode))
