@@ -1,11 +1,13 @@
 package mgrconfig
 
 import (
+	"container/list"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 
+	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/simple"
 )
 
@@ -67,6 +69,74 @@ func (cfg *Config) loadCallGraph() (*CallGraph, error) {
 	return &CallGraph{Graph: g, NodeMap: nodeMap}, nil
 }
 
-func (cfg *Config) calcurateShortestPath() int32 {
+// findShortestPaths finds shortest paths leading to the target node using BFS, limited to maxPaths.
+func findShortestPaths(g *CallGraph, target string, maxPaths int) [][]graph.Node {
+	var paths [][]graph.Node
+	queue := list.New()
+	pathCount := 0
+
+	if targetNode, ok := g.NodeMap[target]; ok {
+		queue.PushBack([]graph.Node{targetNode})
+
+		for queue.Len() > 0 && pathCount < maxPaths {
+			currentPath := queue.Remove(queue.Front()).([]graph.Node)
+			currentNode := currentPath[len(currentPath)-1]
+
+			// If we've reached a source node, add the path
+			if g.Graph.To(currentNode.ID()) == nil || g.Graph.To(currentNode.ID()).Len() == 0 {
+				paths = append(paths, currentPath)
+				pathCount++
+				if pathCount >= maxPaths {
+					fmt.Printf("Path limit (%d) reached. Stopping exploration.\n", maxPaths)
+					break
+				}
+			}
+
+			// Add predecessors to the queue
+			for neighbors := g.Graph.To(currentNode.ID()); neighbors.Next(); {
+				predecessor := neighbors.Node()
+				// Avoid cycles
+				if !containsNode(currentPath, predecessor) {
+					newPath := append([]graph.Node{}, currentPath...)
+					newPath = append(newPath, predecessor)
+					queue.PushBack(newPath)
+				}
+			}
+		}
+	}
+
+	fmt.Printf("Found %d paths\n", len(paths))
+	return paths
+}
+
+// containsNode checks if a node is in the given path
+func containsNode(path []graph.Node, node graph.Node) bool {
+	for _, n := range path {
+		if n.ID() == node.ID() {
+			return true
+		}
+	}
+	return false
+}
+
+// printPaths prints all paths in a readable format.
+func printPaths(paths [][]graph.Node, g *CallGraph) {
+	for _, path := range paths {
+		for i := len(path) - 1; i >= 0; i-- { // Reverse the path for printing source-to-target
+			for id, n := range g.NodeMap {
+				if n.ID() == path[i].ID() {
+					fmt.Print(id)
+					if i > 0 {
+						fmt.Print(" -> ")
+					}
+					break
+				}
+			}
+		}
+		fmt.Println()
+	}
+}
+
+func (cfg *Config) calcurateShortestPath() int64 {
 	return 0
 }
