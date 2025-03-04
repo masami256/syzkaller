@@ -47,7 +47,6 @@ func CoverageFilter(source *ReportGeneratorWrapper, covCfg mgrconfig.CovFilterCf
 	if err := covFilterAddRawPCs(pcs, covCfg.RawPCs); err != nil {
 		return nil, err
 	}
-
 	// DGF
 	if err := covFilterAddDirectedPcs(pcs, covCfg.Functions, foreachSymbol, strict); err != nil {
 		return nil, err
@@ -152,7 +151,10 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 	strict bool) (CoverageFilters, error) {
 	var ret CoverageFilters
 	needExecutorFilter := len(cfg.Experimental.FocusAreas) > 0
+
 	for _, area := range cfg.Experimental.FocusAreas {
+		// DGF: TODO: pass Callgraph data to CoverageFilter()
+
 		pcs, err := CoverageFilter(source, area.Filter, strict)
 		if err != nil {
 			return ret, err

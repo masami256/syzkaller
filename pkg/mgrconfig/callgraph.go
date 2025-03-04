@@ -36,6 +36,7 @@ type CallGraph struct {
 // loadCallGraph reads a JSON file and creates a call graph.
 func (cfg *Config) loadCallGraph() (*CallGraph, error) {
 	// Open and read the JSON file
+
 	file, err := os.Open(cfg.Experimental.DirectedGreyboxFuzzing.GraphFileName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %v", err)
@@ -140,3 +141,7 @@ func printPaths(paths [][]graph.Node, g *CallGraph) {
 func (cfg *Config) calcurateShortestPath() int64 {
 	return 0
 }
+
+//buf := make([]byte, 1024)
+//n := runtime.Stack(buf, false)
+//log.Logf(0, "stack trace: %s", string(buf[:n]))

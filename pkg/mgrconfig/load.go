@@ -207,6 +207,7 @@ func Complete(cfg *Config) error {
 	}
 	cfg.initTimeouts()
 	cfg.VMLess = cfg.Type == "none"
+
 	return nil
 }
 
@@ -279,7 +280,7 @@ func (cov *CovFilterCfg) Empty() bool {
 
 // DGF
 func (cov *CovFilterCfg) EmptyDFG() bool {
-	return len(cov.TargetFuncsion) == 0
+	return len(cov.TargetFunction) == 0
 }
 
 func (cfg *Config) CompleteKernelDirs() {
@@ -386,7 +387,7 @@ func (cfg *Config) completeFocusAreas() error {
 	return nil
 }
 
-// DGF
+// DGF: completeDirectedGreyboxFuzzing completes the configuration for directed greybox fuzzing
 func (cfg *Config) completeDirectedGreyboxFuzzing() error {
 	if len(cfg.Experimental.DirectedGreyboxFuzzing.FunctionName) == 0 {
 		return nil
@@ -407,8 +408,9 @@ func (cfg *Config) completeDirectedGreyboxFuzzing() error {
 		return err
 	}
 
-	functions := []string{cfg.Experimental.DirectedGreyboxFuzzing.FunctionName}
-	cfg.CovFilter.Functions = functions
+	function_name := []string{cfg.Experimental.DirectedGreyboxFuzzing.FunctionName}
+	cfg.CovFilter.TargetFunction = function_name
+	cfg.CovFilter.CallGraph = callGraph
 
 	cfg.Experimental.FocusAreas = []FocusArea{
 		{
@@ -417,8 +419,6 @@ func (cfg *Config) completeDirectedGreyboxFuzzing() error {
 			Weight: 10.0,
 		},
 	}
-	cfg.CovFilter = CovFilterCfg{}
-	cfg.CovFilter.CallGraph = callGraph
 
 	return nil
 }

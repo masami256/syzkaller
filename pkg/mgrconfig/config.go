@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/syzkaller/pkg/asset"
+	"gonum.org/v1/gonum/graph"
 )
 
 type Config struct {
@@ -297,6 +298,8 @@ type CovFilterCfg struct {
 	Files          []string `json:"files,omitempty"`
 	Functions      []string `json:"functions,omitempty"`
 	RawPCs         []string `json:"pcs,omitempty"`
-	TargetFuncsion string
-	CallGraph      *CallGraph
+	TargetFunction []string
+	// DGF:
+	CallGraph   *CallGraph
+	TargetPaths [][]graph.Node
 }
