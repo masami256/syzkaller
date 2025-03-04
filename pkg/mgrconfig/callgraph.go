@@ -70,9 +70,9 @@ func (cfg *Config) loadCallGraph() (*CallGraph, error) {
 	return &CallGraph{Graph: g, NodeMap: nodeMap}, nil
 }
 
-// findShortestPaths finds shortest paths leading to the target node using BFS, limited to maxPaths.
-func findShortestPaths(g *CallGraph, target string, maxPaths int) [][]graph.Node {
-	var paths [][]graph.Node
+// FindShortestPaths finds shortest paths leading to the target node using BFS, limited to maxPaths.
+func FindShortestPaths(g *CallGraph, target string, maxPaths int) ([]string, [][]string) {
+	var paths [][]string
 	queue := list.New()
 	pathCount := 0
 
@@ -85,7 +85,8 @@ func findShortestPaths(g *CallGraph, target string, maxPaths int) [][]graph.Node
 
 			// If we've reached a source node, add the path
 			if g.Graph.To(currentNode.ID()) == nil || g.Graph.To(currentNode.ID()).Len() == 0 {
-				paths = append(paths, currentPath)
+				stringPath := convertNodePathToStringPath(currentPath, g)
+				paths = append(paths, stringPath)
 				pathCount++
 				if pathCount >= maxPaths {
 					fmt.Printf("Path limit (%d) reached. Stopping exploration.\n", maxPaths)
@@ -107,7 +108,38 @@ func findShortestPaths(g *CallGraph, target string, maxPaths int) [][]graph.Node
 	}
 
 	fmt.Printf("Found %d paths\n", len(paths))
-	return paths
+	return uniqueStrings(paths), paths
+}
+
+// uniqueStrings takes a 2D slice of strings and returns a 1D slice of unique strings.
+func uniqueStrings(data [][]string) []string {
+	uniqueSet := make(map[string]struct{})
+	for _, sublist := range data {
+		for _, item := range sublist {
+			uniqueSet[item] = struct{}{}
+		}
+	}
+
+	uniqueList := make([]string, 0, len(uniqueSet))
+	for item := range uniqueSet {
+		uniqueList = append(uniqueList, item)
+	}
+
+	return uniqueList
+}
+
+// convertNodePathToStringPath converts a path of graph.Nodes to a path of strings
+func convertNodePathToStringPath(path []graph.Node, g *CallGraph) []string {
+	var stringPath []string
+	for i := len(path) - 1; i >= 0; i-- { // Reverse the path for printing source-to-target
+		for id, n := range g.NodeMap {
+			if n.ID() == path[i].ID() {
+				stringPath = append(stringPath, id)
+				break
+			}
+		}
+	}
+	return stringPath
 }
 
 // containsNode checks if a node is in the given path

@@ -48,7 +48,7 @@ func CoverageFilter(source *ReportGeneratorWrapper, covCfg mgrconfig.CovFilterCf
 		return nil, err
 	}
 	// DGF
-	if err := covFilterAddDirectedPcs(pcs, covCfg.Functions, foreachSymbol, strict); err != nil {
+	if err := covFilterAddDirectedPcs(pcs, covCfg, foreachSymbol, strict); err != nil {
 		return nil, err
 	}
 
@@ -125,9 +125,73 @@ func covFilterAddRawPCs(pcs map[uint64]struct{}, rawPCsFiles []string) error {
 	return nil
 }
 
-func covFilterAddDirectedPcs(pcs map[uint64]struct{}, filters []string, foreach func(func(*backend.ObjectUnit)),
+func covFilterAddDirectedPcs(pcs map[uint64]struct{}, covCfg mgrconfig.CovFilterCfg, foreach func(func(*backend.ObjectUnit)),
 	strict bool) error {
-	return covFilterAddFilter(pcs, filters, foreach, strict)
+
+	target_function := covCfg.TargetFunction
+	tmp, paths := mgrconfig.FindShortestPaths(covCfg.CallGraph, target_function[0], 20)
+
+	covCfg.TargetPaths = paths
+
+	// We need to add the target function to the list of functions to be covered.
+	// We add ^ and $ to the function name to ensure that we match the exact function name.
+	uniq_function_names_tmp := func(strings []string) []string {
+		processed := make([]string, len(strings))
+		for i, s := range strings {
+			processed[i] = s
+		}
+		return processed
+	}(tmp)
+
+	processedStrings := func(strings []string) []string {
+		processed := make([]string, len(strings))
+		for i, s := range strings {
+			processed[i] = "^" + s + "$"
+		}
+		return processed
+	}(uniq_function_names_tmp)
+
+	filters := processedStrings
+	//covCfg.Functions = []string{}
+	//covCfg.Functions = append(covCfg.Functions, "^cpuset_write_resmaskaaaa$")
+
+	res, err := compileRegexps(filters)
+	if err != nil {
+		return err
+	}
+
+	log.Logf(0, "res: %v", res)
+	uniq_function_names := []string{}
+
+	used := make(map[*regexp.Regexp][]string)
+	foreach(func(unit *backend.ObjectUnit) {
+		for _, re := range res {
+			if re.MatchString(unit.Name) {
+				// We add both coverage points and comparison interception points
+				// because executor filters comparisons as well.
+				for _, pc := range unit.PCs {
+					pcs[pc] = struct{}{}
+				}
+				for _, pc := range unit.CMPs {
+					pcs[pc] = struct{}{}
+				}
+				used[re] = append(used[re], unit.Name)
+				uniq_function_names = append(uniq_function_names, unit.Name)
+				break
+			}
+		}
+	})
+	for _, re := range res {
+		sort.Strings(used[re])
+		log.Logf(0, "coverage filter: %v: %v", re, used[re])
+	}
+	if strict && len(res) != len(used) {
+		//return fmt.Errorf("some filters don't match anything")
+		log.Logf(0, "some filters don't match anything")
+	}
+
+	covCfg.Functions = uniq_function_names
+	return nil
 }
 
 func compileRegexps(regexpStrings []string) ([]*regexp.Regexp, error) {
@@ -153,8 +217,6 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 	needExecutorFilter := len(cfg.Experimental.FocusAreas) > 0
 
 	for _, area := range cfg.Experimental.FocusAreas {
-		// DGF: TODO: pass Callgraph data to CoverageFilter()
-
 		pcs, err := CoverageFilter(source, area.Filter, strict)
 		if err != nil {
 			return ret, err
