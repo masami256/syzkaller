@@ -211,10 +211,12 @@ func main() {
 		log.Fatalf("bad syz-manager build: build with make, run bin/syz-manager")
 	}
 	log.EnableLogCaching(1000, 1<<20)
+	// DGF: parse config file
 	cfg, err := mgrconfig.LoadFile(*flagConfig)
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
+
 	if cfg.DashboardAddr != "" {
 		// This lets better distinguish logs of individual syz-manager instances.
 		log.SetName(cfg.Name)
@@ -1445,7 +1447,10 @@ func (mgr *Manager) CoverageFilter(modules []*vminfo.KernelModule) ([]uint64, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to init coverage filter: %w", err)
 	}
+
 	mgr.coverFilters = filters
+	//log.Logf(0, "DGF: CallGraph: %v", mgr.cfg.CovFilter.CallGraph)
+	//log.Logf(0, "DGF: Callgraph data end")
 	mgr.http.Cover.Store(&manager.CoverageInfo{
 		Modules:         modules,
 		ReportGenerator: mgr.reportGenerator,

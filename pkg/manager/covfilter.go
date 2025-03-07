@@ -18,15 +18,17 @@ import (
 )
 
 func CoverageFilter(source *ReportGeneratorWrapper, covCfg mgrconfig.CovFilterCfg,
-	strict bool) (map[uint64]struct{}, error) {
+	strict bool) (map[uint64]struct{}, map[string]uint64, error) {
 	if covCfg.Empty() && covCfg.EmptyDFG() {
-		return nil, nil
+		return nil, nil, nil
 	}
 	rg, err := source.Get()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	pcs := make(map[uint64]struct{})
+	names := make(map[string]uint64)
+
 	foreachSymbol := func(apply func(*backend.ObjectUnit)) {
 		for _, sym := range rg.Symbols {
 			apply(&sym.ObjectUnit)
@@ -34,7 +36,7 @@ func CoverageFilter(source *ReportGeneratorWrapper, covCfg mgrconfig.CovFilterCf
 	}
 
 	if err := covFilterAddFilter(pcs, covCfg.Functions, foreachSymbol, strict); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	foreachUnit := func(apply func(*backend.ObjectUnit)) {
 		for _, unit := range rg.Units {
@@ -42,18 +44,18 @@ func CoverageFilter(source *ReportGeneratorWrapper, covCfg mgrconfig.CovFilterCf
 		}
 	}
 	if err := covFilterAddFilter(pcs, covCfg.Files, foreachUnit, strict); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := covFilterAddRawPCs(pcs, covCfg.RawPCs); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// DGF
-	if err := covFilterAddDirectedPcs(pcs, covCfg, foreachSymbol, strict); err != nil {
-		return nil, err
+	if err := covFilterAddDirectedPcs(pcs, names, covCfg, foreachSymbol, strict); err != nil {
+		return nil, nil, err
 	}
 
 	// Note that pcs may include both comparison and block/edge coverage callbacks.
-	return pcs, nil
+	return pcs, names, nil
 }
 
 func covFilterAddFilter(pcs map[uint64]struct{}, filters []string, foreach func(func(*backend.ObjectUnit)),
@@ -125,7 +127,8 @@ func covFilterAddRawPCs(pcs map[uint64]struct{}, rawPCsFiles []string) error {
 	return nil
 }
 
-func covFilterAddDirectedPcs(pcs map[uint64]struct{}, covCfg mgrconfig.CovFilterCfg, foreach func(func(*backend.ObjectUnit)),
+func covFilterAddDirectedPcs(pcs map[uint64]struct{}, names map[string]uint64,
+	covCfg mgrconfig.CovFilterCfg, foreach func(func(*backend.ObjectUnit)),
 	strict bool) error {
 
 	target_function := covCfg.TargetFunction
@@ -133,16 +136,24 @@ func covFilterAddDirectedPcs(pcs map[uint64]struct{}, covCfg mgrconfig.CovFilter
 
 	covCfg.TargetPaths = paths
 
-	// We need to add the target function to the list of functions to be covered.
-	// We add ^ and $ to the function name to ensure that we match the exact function name.
+	// Create unique function names list
 	uniq_function_names_tmp := func(strings []string) []string {
-		processed := make([]string, len(strings))
-		for i, s := range strings {
-			processed[i] = s
+		// Map to track seen strings
+		seen := make(map[string]struct{})
+		// Slice to store result
+		var result []string
+
+		// Iterate over each string
+		for _, s := range strings {
+			if _, ok := seen[s]; !ok {
+				seen[s] = struct{}{}
+				result = append(result, s)
+			}
 		}
-		return processed
+		return result
 	}(tmp)
 
+	// Add regex symbols to the list of functions to be covered
 	processedStrings := func(strings []string) []string {
 		processed := make([]string, len(strings))
 		for i, s := range strings {
@@ -152,15 +163,12 @@ func covFilterAddDirectedPcs(pcs map[uint64]struct{}, covCfg mgrconfig.CovFilter
 	}(uniq_function_names_tmp)
 
 	filters := processedStrings
-	//covCfg.Functions = []string{}
-	//covCfg.Functions = append(covCfg.Functions, "^cpuset_write_resmaskaaaa$")
 
 	res, err := compileRegexps(filters)
 	if err != nil {
 		return err
 	}
 
-	log.Logf(0, "res: %v", res)
 	uniq_function_names := []string{}
 
 	used := make(map[*regexp.Regexp][]string)
@@ -171,6 +179,8 @@ func covFilterAddDirectedPcs(pcs map[uint64]struct{}, covCfg mgrconfig.CovFilter
 				// because executor filters comparisons as well.
 				for _, pc := range unit.PCs {
 					pcs[pc] = struct{}{}
+					names[unit.Name] = pc
+					log.Logf(0, "DGF:DEBUG: Adding %s:0x%x to the list of functions to be covered", unit.Name, pc)
 				}
 				for _, pc := range unit.CMPs {
 					pcs[pc] = struct{}{}
@@ -209,6 +219,8 @@ func compileRegexps(regexpStrings []string) ([]*regexp.Regexp, error) {
 type CoverageFilters struct {
 	Areas          []corpus.FocusArea
 	ExecutorFilter map[uint64]struct{}
+	FunctionNames  map[string]uint64
+	PathsByPC      map[uint64][]string
 }
 
 func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Config,
@@ -217,7 +229,7 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 	needExecutorFilter := len(cfg.Experimental.FocusAreas) > 0
 
 	for _, area := range cfg.Experimental.FocusAreas {
-		pcs, err := CoverageFilter(source, area.Filter, strict)
+		pcs, names, err := CoverageFilter(source, area.Filter, strict)
 		if err != nil {
 			return ret, err
 		}
@@ -235,6 +247,10 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 		if area.Filter.Empty() && area.Filter.EmptyDFG() {
 			// An empty cover filter indicates that the user is interested in all the coverage.
 			needExecutorFilter = false
+		}
+		ret.FunctionNames = names
+
+		if len(area.Filter.TargetFunction) > 0 {
 		}
 	}
 	if needExecutorFilter {
