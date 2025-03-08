@@ -107,7 +107,7 @@ func FindShortestPaths(g *CallGraph, target string, maxPaths int) ([]string, [][
 		}
 	}
 
-	fmt.Printf("Found %d paths\n", len(paths))
+	fmt.Printf("DGF: DEBUG: Found %d paths\n", len(paths))
 	return uniqueStrings(paths), paths
 }
 
@@ -170,7 +170,7 @@ func printPaths(paths [][]graph.Node, g *CallGraph) {
 	}
 }
 
-func (cfg *Config) calcurateShortestPath() int64 {
+func CalcurateShortestPath() int64 {
 	return 0
 }
 

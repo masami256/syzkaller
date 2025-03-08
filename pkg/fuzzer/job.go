@@ -154,6 +154,7 @@ func (job *triageJob) run(fuzzer *Fuzzer) {
 	for call, info := range job.calls {
 		wg.Add(1)
 		go func() {
+			// GDF: DEBUG: call handleCall in job.go at 165
 			job.handleCall(call, info)
 			wg.Done()
 		}()
@@ -210,7 +211,7 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
 
 	//diff := info.cover.Diff(info.rawCover)
 	//job.fuzzer.Logf(0, "NewDiff 0x%x", diff)
-	job.fuzzer.Logf(2, "added new input for %v to the corpus: %s", callName, p)
+	job.fuzzer.Logf(0, "added new input for %v to the corpus: %s", callName, p)
 	input := corpus.NewInput{
 		Prog:     p,
 		Call:     call,
@@ -218,7 +219,7 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
 		Cover:    info.cover.Serialize(),
 		RawCover: info.rawCover,
 	}
-	// DGF: Merge Coverages
+	// DGF: Call Save() in corpus.go at 131
 	job.fuzzer.Config.Corpus.Save(input)
 }
 

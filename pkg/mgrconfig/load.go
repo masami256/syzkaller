@@ -417,6 +417,7 @@ func (cfg *Config) completeDirectedGreyboxFuzzing() error {
 			Name:   "filtered",
 			Filter: cfg.CovFilter,
 			Weight: 10.0,
+			Foobar: 42,
 		},
 	}
 

@@ -180,7 +180,7 @@ func covFilterAddDirectedPcs(pcs map[uint64]struct{}, names map[string]uint64,
 				for _, pc := range unit.PCs {
 					pcs[pc] = struct{}{}
 					names[unit.Name] = pc
-					log.Logf(0, "DGF:DEBUG: Adding %s:0x%x to the list of functions to be covered", unit.Name, pc)
+					log.Logf(0, "DGF: DEBUG: Adding %s:0x%x to the list of functions to be covered", unit.Name, pc)
 				}
 				for _, pc := range unit.CMPs {
 					pcs[pc] = struct{}{}
@@ -239,10 +239,13 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 			next := backend.NextInstructionPC(cfg.SysTarget, cfg.Type, pc)
 			covPCs[next] = struct{}{}
 		}
+		// DGF: Set focus area to Corpaus.FocusArea definfed in pkg/corpus/corpus.go at line 42
 		ret.Areas = append(ret.Areas, corpus.FocusArea{
-			Name:     area.Name,
-			CoverPCs: covPCs,
-			Weight:   area.Weight,
+			Name:      area.Name,
+			CoverPCs:  covPCs,
+			Weight:    area.Weight,
+			Foobar:    area.Foobar,
+			CallGraph: area.CallGraph,
 		})
 		if area.Filter.Empty() && area.Filter.EmptyDFG() {
 			// An empty cover filter indicates that the user is interested in all the coverage.

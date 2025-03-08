@@ -1127,6 +1127,7 @@ func (mgr *Manager) MachineChecked(features flatrpc.Feature,
 
 	if mgr.mode == ModeFuzzing || mgr.mode == ModeCorpusTriage {
 		corpusUpdates := make(chan corpus.NewItemEvent, 128)
+		// DGF: DEBUG : calling NewFocusedCorpus() in corpus.go at 56
 		mgr.corpus = corpus.NewFocusedCorpus(context.Background(),
 			corpusUpdates, mgr.coverFilters.Areas)
 		mgr.http.Corpus.Store(mgr.corpus)

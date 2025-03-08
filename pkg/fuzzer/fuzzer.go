@@ -288,7 +288,7 @@ func (fuzzer *Fuzzer) genFuzz() *queue.Request {
 		if mutatedReq == nil {
 			mutatedReq = genProgRequest(fuzzer, rnd)
 		}
-		fuzzer.Logf(0, "genFuzz(): Mutated request %d/%d: %s", i+1, energy, mutatedReq.Prog)
+		//fuzzer.Logf(0, "DGF: DEBUG: genFuzz(): Mutated request %d/%d: %s", i+1, energy, mutatedReq.Prog)
 		fuzzer.prepare(mutatedReq, 0, 0)
 	}
 
@@ -328,6 +328,7 @@ func (fuzzer *Fuzzer) startJob(stat *stat.Val, newJob job) {
 }
 
 func (fuzzer *Fuzzer) Next() *queue.Request {
+	// DGF: DEBUG: genFuzz(): calling Next() in queue.go at 324
 	req := fuzzer.source.Next()
 	if req == nil {
 		// The fuzzer is not supposed to issue nil requests.
@@ -497,5 +498,5 @@ func DefaultExecOpts(cfg *mgrconfig.Config, features flatrpc.Feature, debug bool
 
 func assignEnergy(req *queue.Request) int {
 	// Assign energy to the generated request.
-	return 10
+	return 1
 }

@@ -277,7 +277,9 @@ type FocusArea struct {
 	Filter CovFilterCfg `json:"filter,omitempty"`
 
 	// Weight is a positive number that determines how much focus should be put on this area.
-	Weight float64 `json:"weight"`
+	Weight    float64 `json:"weight"`
+	Foobar    int64
+	CallGraph *CallGraph
 }
 
 type DirectedGreyboxFuzzing struct {

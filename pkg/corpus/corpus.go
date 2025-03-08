@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/syzkaller/pkg/cover"
 	"github.com/google/syzkaller/pkg/hash"
+	"github.com/google/syzkaller/pkg/mgrconfig"
 	"github.com/google/syzkaller/pkg/signal"
 	"github.com/google/syzkaller/pkg/stat"
 	"github.com/google/syzkaller/prog"
@@ -40,9 +41,11 @@ type focusAreaState struct {
 }
 
 type FocusArea struct {
-	Name     string // can be empty
-	CoverPCs map[uint64]struct{}
-	Weight   float64
+	Name      string // can be empty
+	CoverPCs  map[uint64]struct{}
+	Weight    float64
+	Foobar    int64
+	CallGraph *mgrconfig.CallGraph
 }
 
 func NewCorpus(ctx context.Context) *Corpus {
@@ -66,10 +69,14 @@ func NewFocusedCorpus(ctx context.Context, updates chan<- NewItemEvent, areas []
 		stat.LenOf(&corpus.signal, &corpus.mu))
 	corpus.StatCover = stat.New("coverage", "Source coverage in the corpus", stat.Console,
 		stat.Link("/cover"), stat.Prometheus("syz_corpus_cover"), stat.LenOf(&corpus.cover, &corpus.mu))
+	fmt.Printf("DGF: DEBUG: len(areas): %d\n", len(areas))
+	fmt.Printf("DGF: DEBUG: areas: %v\n", areas)
 	for _, area := range areas {
+		fmt.Printf("DGF: DEBUG: area.Name: %q\n", area.Name)
 		obj := &ProgramsList{}
 		if len(areas) > 1 && area.Name != "" {
 			// Only show extra statistics if there's more than one area.
+			fmt.Printf("DGF: DEBUG: Corpus programs of the focus area %q", area.Name)
 			stat.New("corpus ["+area.Name+"]",
 				fmt.Sprintf("Corpus programs of the focus area %q", area.Name),
 				stat.Console, stat.Graph("corpus"),
@@ -137,6 +144,7 @@ func (corpus *Corpus) Save(inp NewInput) {
 		RawCover: inp.RawCover,
 	}
 	exists := false
+	interesting := false
 	if old, ok := corpus.progsMap[sig]; ok {
 		exists = true
 		newSignal := old.Signal.Copy()
@@ -159,7 +167,7 @@ func (corpus *Corpus) Save(inp NewInput) {
 			newItem.Updates = append(newItem.Updates, update)
 		}
 		corpus.progsMap[sig] = newItem
-		corpus.applyFocusAreas(newItem, inp.Cover)
+		interesting = corpus.applyFocusAreas(newItem, inp.Cover)
 	} else {
 		item := &Item{
 			Sig:     sig,
@@ -171,31 +179,41 @@ func (corpus *Corpus) Save(inp NewInput) {
 			Updates: []ItemUpdate{update},
 		}
 		corpus.progsMap[sig] = item
-		corpus.applyFocusAreas(item, inp.Cover)
-		corpus.saveProgram(inp.Prog, inp.Signal)
+		interesting = corpus.applyFocusAreas(item, inp.Cover)
+		if interesting {
+			corpus.saveProgram(inp.Prog, inp.Signal)
+		}
 	}
-	corpus.signal.Merge(inp.Signal)
-	newCover := corpus.cover.MergeDiff(inp.Cover)
-	if corpus.updates != nil {
-		select {
-		case <-corpus.ctx.Done():
-		case corpus.updates <- NewItemEvent{
-			Sig:      sig,
-			Exists:   exists,
-			ProgData: progData,
-			NewCover: newCover,
-		}:
+
+	if interesting {
+		corpus.signal.Merge(inp.Signal)
+		newCover := corpus.cover.MergeDiff(inp.Cover)
+		if corpus.updates != nil {
+			select {
+			case <-corpus.ctx.Done():
+			case corpus.updates <- NewItemEvent{
+				Sig:      sig,
+				Exists:   exists,
+				ProgData: progData,
+				NewCover: newCover,
+			}:
+			}
 		}
 	}
 }
 
-func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) {
+func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
+	interesting := false
+	fmt.Printf("DGF: DEBUG: applyFocusAreas is called\n")
 	// DGF: Check if the coverDelta matches any of the focus areas
 	for _, area := range corpus.focusAreas {
 		matches := false
+		fmt.Printf("DGF: DEBUG: applyFocusAreas: area.FocusArea.Foobar = %d\n", area.FocusArea.Foobar)
 		for _, pc := range coverDelta {
 			if _, ok := area.CoverPCs[pc]; ok {
 				matches = true
+				fmt.Printf("DGF: DEBUG: applyFocusAreas: matches PC = 0x%x\n", pc)
+				interesting = true
 				break
 			}
 		}
@@ -208,6 +226,8 @@ func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) {
 			item.areas[area] = struct{}{}
 		}
 	}
+
+	return interesting
 }
 
 func (corpus *Corpus) Signal() signal.Signal {

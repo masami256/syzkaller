@@ -303,6 +303,7 @@ func Order(sources ...Source) Source {
 
 func (o *orderImpl) Next() *Request {
 	for _, s := range o.sources {
+		// DGF: DEBUG: genFuzz(): calling Next() in queue.go at 324
 		req := s.Next()
 		if req != nil {
 			return req
@@ -321,6 +322,7 @@ func Callback(cb func() *Request) Source {
 }
 
 func (cb *callback) Next() *Request {
+	// DGF: DEBUG: genFuzz(): calling genFuzz() in fuzzer.go
 	return cb.cb()
 }
 
@@ -410,6 +412,7 @@ func (ds *DynamicSourceCtl) Store(source Source) {
 }
 
 func (ds *DynamicSourceCtl) Next() *Request {
+	// DGF: DEBUG: genFuzz(): calling Next() in queue.go at 493
 	return (*ds.value.Load()).Next()
 }
 
@@ -488,6 +491,7 @@ type defaultOpts struct {
 }
 
 func (do *defaultOpts) Next() *Request {
+	// DGF: DEBUG: genFuzz(): calling Next() in fuzzer.go at 336
 	req := do.source.Next()
 	if req == nil {
 		return nil

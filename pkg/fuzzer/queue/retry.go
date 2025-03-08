@@ -23,6 +23,7 @@ func Retry(base Source) Source {
 func (r *retryer) Next() *Request {
 	req := r.pq.tryNext()
 	if req == nil {
+		// DGF: DEBUG: genFuzz(): calling Next() in queue.go at 414
 		req = r.base.Next()
 	}
 	if req != nil {
