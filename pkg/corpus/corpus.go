@@ -41,11 +41,13 @@ type focusAreaState struct {
 }
 
 type FocusArea struct {
-	Name      string // can be empty
-	CoverPCs  map[uint64]struct{}
-	Weight    float64
-	Foobar    int64
-	CallGraph *mgrconfig.CallGraph
+	Name           string // can be empty
+	CoverPCs       map[uint64]struct{}
+	Weight         float64
+	Foobar         int64
+	CallGraph      *mgrconfig.CallGraph
+	FunctoinNames  map[uint64]string
+	TargetFunction string
 }
 
 func NewCorpus(ctx context.Context) *Corpus {
@@ -69,10 +71,8 @@ func NewFocusedCorpus(ctx context.Context, updates chan<- NewItemEvent, areas []
 		stat.LenOf(&corpus.signal, &corpus.mu))
 	corpus.StatCover = stat.New("coverage", "Source coverage in the corpus", stat.Console,
 		stat.Link("/cover"), stat.Prometheus("syz_corpus_cover"), stat.LenOf(&corpus.cover, &corpus.mu))
-	fmt.Printf("DGF: DEBUG: len(areas): %d\n", len(areas))
-	fmt.Printf("DGF: DEBUG: areas: %v\n", areas)
+
 	for _, area := range areas {
-		fmt.Printf("DGF: DEBUG: area.Name: %q\n", area.Name)
 		obj := &ProgramsList{}
 		if len(areas) > 1 && area.Name != "" {
 			// Only show extra statistics if there's more than one area.
@@ -204,20 +204,34 @@ func (corpus *Corpus) Save(inp NewInput) {
 
 func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
 	interesting := false
-	fmt.Printf("DGF: DEBUG: applyFocusAreas is called\n")
 	// DGF: Check if the coverDelta matches any of the focus areas
 	for _, area := range corpus.focusAreas {
 		matches := false
-		fmt.Printf("DGF: DEBUG: applyFocusAreas: area.FocusArea.Foobar = %d\n", area.FocusArea.Foobar)
 		for _, pc := range coverDelta {
+			// if val, ok := area.FunctoinNames[pc]; ok {
+			// 	fmt.Printf("DGF: DEBUG: applyFocusAreas:found function pc = 0x%x, val = %v\n", pc, val)
+			// }
+
 			if _, ok := area.CoverPCs[pc]; ok {
 				matches = true
-				fmt.Printf("DGF: DEBUG: applyFocusAreas: matches PC = 0x%x\n", pc)
+				// fmt.Printf("DGF: DEBUG: applyFocusAreas: matches PC = 0x%x\n", pc)
 				interesting = true
 				break
+			} else {
+				if start, ok := area.FunctoinNames[pc]; ok {
+					d, err := mgrconfig.CalculateShortestPath(area.CallGraph, start, area.TargetFunction)
+					if err == nil {
+						fmt.Printf("DGF: DEBUG: applyFocusAreas: distance from %v to %v is %d\n", start, area.TargetFunction, d)
+						if d < 5 {
+							fmt.Printf("DGF: DEBUG: applyFocusAreas: function %v is interesting\n", start)
+							interesting = true
+							break
+						}
+					}
+				}
 			}
 		}
-		if !matches {
+		if !matches && !interesting {
 			continue
 		}
 		area.saveProgram(item.Prog, item.Signal)

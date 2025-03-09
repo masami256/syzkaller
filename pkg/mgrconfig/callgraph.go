@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"gonum.org/v1/gonum/graph"
+	"gonum.org/v1/gonum/graph/path"
 	"gonum.org/v1/gonum/graph/simple"
 )
 
@@ -170,8 +171,36 @@ func printPaths(paths [][]graph.Node, g *CallGraph) {
 	}
 }
 
-func CalcurateShortestPath() int64 {
-	return 0
+func CalculateShortestPath(g *CallGraph, start, goal string) (int, error) {
+	if len(start) == 0 {
+		return 0, fmt.Errorf("start node is nil")
+	}
+	if len(goal) == 0 {
+		return 0, fmt.Errorf("goal node is nil")
+	}
+
+	if start == goal {
+		return 0, nil
+	}
+
+	startNode, startExists := g.NodeMap[start]
+	goalNode, goalExists := g.NodeMap[goal]
+
+	if !startExists {
+		return 0, fmt.Errorf("start node %s does not exist", start)
+	}
+
+	if !goalExists {
+		return 0, fmt.Errorf("goal node %s does not exist", goal)
+	}
+
+	shortestPath := path.DijkstraFrom(startNode, g.Graph)
+	shortest, _ := shortestPath.To(goalNode.ID())
+	if shortest == nil {
+		return 0, fmt.Errorf("no path found between %s and %s", start, goal)
+	}
+
+	return len(shortest) - 1, nil // -1 because length includes the start node
 }
 
 //buf := make([]byte, 1024)

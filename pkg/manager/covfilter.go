@@ -18,7 +18,7 @@ import (
 )
 
 func CoverageFilter(source *ReportGeneratorWrapper, covCfg mgrconfig.CovFilterCfg,
-	strict bool) (map[uint64]struct{}, map[string]uint64, error) {
+	strict bool) (map[uint64]struct{}, map[uint64]string, error) {
 	if covCfg.Empty() && covCfg.EmptyDFG() {
 		return nil, nil, nil
 	}
@@ -27,7 +27,7 @@ func CoverageFilter(source *ReportGeneratorWrapper, covCfg mgrconfig.CovFilterCf
 		return nil, nil, err
 	}
 	pcs := make(map[uint64]struct{})
-	names := make(map[string]uint64)
+	names := make(map[uint64]string)
 
 	foreachSymbol := func(apply func(*backend.ObjectUnit)) {
 		for _, sym := range rg.Symbols {
@@ -127,7 +127,7 @@ func covFilterAddRawPCs(pcs map[uint64]struct{}, rawPCsFiles []string) error {
 	return nil
 }
 
-func covFilterAddDirectedPcs(pcs map[uint64]struct{}, names map[string]uint64,
+func covFilterAddDirectedPcs(pcs map[uint64]struct{}, names map[uint64]string,
 	covCfg mgrconfig.CovFilterCfg, foreach func(func(*backend.ObjectUnit)),
 	strict bool) error {
 
@@ -179,8 +179,8 @@ func covFilterAddDirectedPcs(pcs map[uint64]struct{}, names map[string]uint64,
 				// because executor filters comparisons as well.
 				for _, pc := range unit.PCs {
 					pcs[pc] = struct{}{}
-					names[unit.Name] = pc
-					log.Logf(0, "DGF: DEBUG: Adding %s:0x%x to the list of functions to be covered", unit.Name, pc)
+					names[pc] = unit.Name
+					//log.Logf(0, "DGF: DEBUG: Adding %s:0x%x to the list of functions to be covered", unit.Name, pc)
 				}
 				for _, pc := range unit.CMPs {
 					pcs[pc] = struct{}{}
@@ -188,6 +188,11 @@ func covFilterAddDirectedPcs(pcs map[uint64]struct{}, names map[string]uint64,
 				used[re] = append(used[re], unit.Name)
 				uniq_function_names = append(uniq_function_names, unit.Name)
 				break
+			} else {
+				for _, pc := range unit.PCs {
+					//log.Logf(0, "DGF: DEBUG: Adding %s:0x%x to the list of functions not to be covered", unit.Name, pc)
+					names[pc] = unit.Name
+				}
 			}
 		}
 	})
@@ -219,7 +224,6 @@ func compileRegexps(regexpStrings []string) ([]*regexp.Regexp, error) {
 type CoverageFilters struct {
 	Areas          []corpus.FocusArea
 	ExecutorFilter map[uint64]struct{}
-	FunctionNames  map[string]uint64
 	PathsByPC      map[uint64][]string
 }
 
@@ -239,21 +243,20 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 			next := backend.NextInstructionPC(cfg.SysTarget, cfg.Type, pc)
 			covPCs[next] = struct{}{}
 		}
+
 		// DGF: Set focus area to Corpaus.FocusArea definfed in pkg/corpus/corpus.go at line 42
 		ret.Areas = append(ret.Areas, corpus.FocusArea{
-			Name:      area.Name,
-			CoverPCs:  covPCs,
-			Weight:    area.Weight,
-			Foobar:    area.Foobar,
-			CallGraph: area.CallGraph,
+			Name:           area.Name,
+			CoverPCs:       covPCs,
+			Weight:         area.Weight,
+			Foobar:         area.Foobar,
+			CallGraph:      cfg.CovFilter.CallGraph,
+			FunctoinNames:  names,
+			TargetFunction: cfg.Experimental.DirectedGreyboxFuzzing.FunctionName,
 		})
 		if area.Filter.Empty() && area.Filter.EmptyDFG() {
 			// An empty cover filter indicates that the user is interested in all the coverage.
 			needExecutorFilter = false
-		}
-		ret.FunctionNames = names
-
-		if len(area.Filter.TargetFunction) > 0 {
 		}
 	}
 	if needExecutorFilter {
