@@ -213,17 +213,15 @@ func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
 		for _, pc := range coverDelta {
 			fmt.Printf("DGF: DEBUG: check pc = 0x%x\n", pc)
 			if _, ok := area.CoverPCs[pc]; ok {
-				matches = true
-
 				fmt.Printf("DGF: DEBUG: applyFocusAreas: matches function %v, PC = 0x%x\n", area.FunctoinNames[pc], pc)
-				interesting = true
+				matches = true
 				break
 			} else {
 				if start, ok := area.FunctoinNames[pc]; ok {
 					d, err := mgrconfig.CalculateShortestPath(area.CallGraph, start, area.TargetFunction)
 					if err == nil {
 						fmt.Printf("DGF: DEBUG: applyFocusAreas: distance from %v to %v is %d\n", start, area.TargetFunction, d)
-						if d < 20 {
+						if d < 5 {
 							fmt.Printf("DGF: DEBUG: applyFocusAreas: function %v is interesting\n", start)
 							interesting = true
 							break
