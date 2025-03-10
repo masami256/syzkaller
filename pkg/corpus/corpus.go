@@ -231,16 +231,17 @@ func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
 					}
 				}
 			}
-		}
-		if !matches && !interesting {
-			continue
-		}
 
-		ret = true
-		area.saveProgram(item.Prog, item.Signal)
-		if item.areas == nil {
-			item.areas = make(map[*focusAreaState]struct{})
-			item.areas[area] = struct{}{}
+			if !matches && !interesting {
+				continue
+			}
+
+			ret = true
+			area.saveProgram(item.Prog, item.Signal)
+			if item.areas == nil {
+				item.areas = make(map[*focusAreaState]struct{})
+				item.areas[area] = struct{}{}
+			}
 		}
 	}
 
