@@ -180,7 +180,7 @@ func covFilterAddDirectedPcs(pcs map[uint64]struct{}, names map[uint64]string,
 				for _, pc := range unit.PCs {
 					pcs[pc] = struct{}{}
 					names[pc] = unit.Name
-					//log.Logf(0, "DGF: DEBUG: Adding %s:0x%x to the list of functions to be covered", unit.Name, pc)
+					log.Logf(0, "DGF: DEBUG: Adding %v:0x%x to the list of functions to be covered", unit.Name, pc)
 				}
 				for _, pc := range unit.CMPs {
 					pcs[pc] = struct{}{}

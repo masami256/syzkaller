@@ -203,18 +203,19 @@ func (corpus *Corpus) Save(inp NewInput) {
 }
 
 func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
-	interesting := false
+	ret := false
+
 	// DGF: Check if the coverDelta matches any of the focus areas
 	for _, area := range corpus.focusAreas {
 		matches := false
-		for _, pc := range coverDelta {
-			// if val, ok := area.FunctoinNames[pc]; ok {
-			// 	fmt.Printf("DGF: DEBUG: applyFocusAreas:found function pc = 0x%x, val = %v\n", pc, val)
-			// }
+		interesting := false
 
+		for _, pc := range coverDelta {
+			fmt.Printf("DGF: DEBUG: check pc = 0x%x\n", pc)
 			if _, ok := area.CoverPCs[pc]; ok {
 				matches = true
-				// fmt.Printf("DGF: DEBUG: applyFocusAreas: matches PC = 0x%x\n", pc)
+
+				fmt.Printf("DGF: DEBUG: applyFocusAreas: matches function %v, PC = 0x%x\n", area.FunctoinNames[pc], pc)
 				interesting = true
 				break
 			} else {
@@ -222,7 +223,7 @@ func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
 					d, err := mgrconfig.CalculateShortestPath(area.CallGraph, start, area.TargetFunction)
 					if err == nil {
 						fmt.Printf("DGF: DEBUG: applyFocusAreas: distance from %v to %v is %d\n", start, area.TargetFunction, d)
-						if d < 5 {
+						if d < 20 {
 							fmt.Printf("DGF: DEBUG: applyFocusAreas: function %v is interesting\n", start)
 							interesting = true
 							break
@@ -234,6 +235,8 @@ func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
 		if !matches && !interesting {
 			continue
 		}
+
+		ret = true
 		area.saveProgram(item.Prog, item.Signal)
 		if item.areas == nil {
 			item.areas = make(map[*focusAreaState]struct{})
@@ -241,7 +244,7 @@ func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
 		}
 	}
 
-	return interesting
+	return ret
 }
 
 func (corpus *Corpus) Signal() signal.Signal {
