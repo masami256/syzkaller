@@ -1002,6 +1002,7 @@ func (mgr *Manager) getNewRepros() [][]byte {
 }
 
 func (mgr *Manager) addNewCandidates(candidates []fuzzer.Candidate) {
+	fmt.Printf("DGF: DEBUG: addNewCandidates() canditates size is %d\n", len(candidates))
 	mgr.mu.Lock()
 	if mgr.phase == phaseTriagedCorpus {
 		mgr.setPhaseLocked(phaseQueriedHub)
