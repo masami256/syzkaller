@@ -131,6 +131,7 @@ type NewItemEvent struct {
 	NewCover []uint64
 }
 
+// Called from handleCall() in fuzzer/job.go
 func (corpus *Corpus) Save(inp NewInput) {
 	// DGF: Merge Coverages
 	progData := inp.Prog.Serialize()
@@ -220,11 +221,12 @@ func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
 				if start, ok := area.FunctoinNames[pc]; ok {
 					d, err := mgrconfig.CalculateShortestPath(area.CallGraph, start, area.TargetFunction)
 					if err == nil {
-						fmt.Printf("DGF: DEBUG: applyFocusAreas: distance from %v to %v is %d\n", start, area.TargetFunction, d)
 						if d < 10 {
-							fmt.Printf("DGF: DEBUG: applyFocusAreas: function %v is interesting\n", start)
+							fmt.Printf("DGF: DEBUG: applyFocusAreas: distance from %v to %v is %d\n", start, area.TargetFunction, d)
 							interesting = true
 							break
+						} else {
+							fmt.Printf("DGF: DEBUG: unknown pc 0x%x\n", pc)
 						}
 					}
 				}
