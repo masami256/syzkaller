@@ -226,7 +226,7 @@ func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
 							interesting = true
 							break
 						} else {
-							fmt.Printf("DGF: DEBUG: unknown pc 0x%x\n", pc)
+							//fmt.Printf("DGF: DEBUG: unknown pc 0x%x\n", pc)
 						}
 					}
 				}
