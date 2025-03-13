@@ -131,27 +131,24 @@ func covFilterAddDirectedPcs(pcs map[uint64]struct{}, names map[uint64]string,
 	covCfg mgrconfig.CovFilterCfg, foreach func(func(*backend.ObjectUnit)),
 	strict bool) error {
 
+	fmt.Printf("DGF: covFilterAddDirectedPcs: before names len = %d\n", len(names))
 	target_function := covCfg.TargetFunction
-	tmp, paths := mgrconfig.FindShortestPaths(covCfg.CallGraph, target_function[0], 20)
+	unique_function_names_in_path, paths := mgrconfig.FindShortestPaths(covCfg.CallGraph, target_function[0], 20)
 
 	covCfg.TargetPaths = paths
 
 	// Create unique function names list
-	uniq_function_names_tmp := func(strings []string) []string {
-		// Map to track seen strings
-		seen := make(map[string]struct{})
+	uniq_function_names_tmp := func(stringMap map[string]string) []string {
 		// Slice to store result
 		var result []string
 
-		// Iterate over each string
-		for _, s := range strings {
-			if _, ok := seen[s]; !ok {
-				seen[s] = struct{}{}
-				result = append(result, s)
-			}
+		// Iterate over each key in the map
+		for key := range stringMap {
+			result = append(result, key)
 		}
+
 		return result
-	}(tmp)
+	}(unique_function_names_in_path)
 
 	// Add regex symbols to the list of functions to be covered
 	processedStrings := func(strings []string) []string {
@@ -179,8 +176,12 @@ func covFilterAddDirectedPcs(pcs map[uint64]struct{}, names map[uint64]string,
 				// because executor filters comparisons as well.
 				for _, pc := range unit.PCs {
 					pcs[pc] = struct{}{}
-					names[pc] = unit.Name
-					log.Logf(0, "DGF: DEBUG: Adding %v:0x%x to the list of functions to be covered", unit.Name, pc)
+					// DGF: TODO Create names list which contains the function name in unique_function_names
+
+					if _, ok := unique_function_names_in_path[unit.Name]; ok {
+						names[pc] = unit.Name
+						log.Logf(0, "DGF: DEBUG: Adding %v:0x%x to the list of functions to be covered", unit.Name, pc)
+					}
 				}
 				for _, pc := range unit.CMPs {
 					pcs[pc] = struct{}{}
@@ -188,11 +189,6 @@ func covFilterAddDirectedPcs(pcs map[uint64]struct{}, names map[uint64]string,
 				used[re] = append(used[re], unit.Name)
 				uniq_function_names = append(uniq_function_names, unit.Name)
 				break
-			} else {
-				for _, pc := range unit.PCs {
-					//log.Logf(0, "DGF: DEBUG: Adding %s:0x%x to the list of functions not to be covered", unit.Name, pc)
-					names[pc] = unit.Name
-				}
 			}
 		}
 	})
@@ -204,6 +200,7 @@ func covFilterAddDirectedPcs(pcs map[uint64]struct{}, names map[uint64]string,
 		//return fmt.Errorf("some filters don't match anything")
 		log.Logf(0, "some filters don't match anything")
 	}
+	fmt.Printf("DGF: covFilterAddDirectedPcs: names len = %d\n", len(names))
 
 	covCfg.Functions = uniq_function_names
 	return nil
@@ -244,14 +241,14 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 			covPCs[next] = struct{}{}
 		}
 
-		// DGF: Set focus area to Corpaus.FocusArea definfed in pkg/corpus/corpus.go at line 42
+		// DGF: Set focus area to Corpus.FocusArea definfed in pkg/corpus/corpus.go at line 42
 		ret.Areas = append(ret.Areas, corpus.FocusArea{
 			Name:           area.Name,
 			CoverPCs:       covPCs,
 			Weight:         area.Weight,
 			Foobar:         area.Foobar,
 			CallGraph:      cfg.CovFilter.CallGraph,
-			FunctoinNames:  names,
+			FunctionNames:  names,
 			TargetFunction: cfg.Experimental.DirectedGreyboxFuzzing.FunctionName,
 		})
 		if area.Filter.Empty() && area.Filter.EmptyDFG() {

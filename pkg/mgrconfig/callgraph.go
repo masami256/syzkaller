@@ -72,7 +72,10 @@ func (cfg *Config) loadCallGraph() (*CallGraph, error) {
 }
 
 // FindShortestPaths finds shortest paths leading to the target node using BFS, limited to maxPaths.
-func FindShortestPaths(g *CallGraph, target string, maxPaths int) ([]string, [][]string) {
+// Returns a list of paths as a list of strings.
+// The first return value is a list of unique strings.
+// The second return value is a list of lists of strings.
+func FindShortestPaths(g *CallGraph, target string, maxPaths int) (map[string]string, [][]string) {
 	var paths [][]string
 	queue := list.New()
 	pathCount := 0
@@ -112,21 +115,14 @@ func FindShortestPaths(g *CallGraph, target string, maxPaths int) ([]string, [][
 	return uniqueStrings(paths), paths
 }
 
-// uniqueStrings takes a 2D slice of strings and returns a 1D slice of unique strings.
-func uniqueStrings(data [][]string) []string {
-	uniqueSet := make(map[string]struct{})
+func uniqueStrings(data [][]string) map[string]string {
+	uniqueMap := make(map[string]string)
 	for _, sublist := range data {
 		for _, item := range sublist {
-			uniqueSet[item] = struct{}{}
+			uniqueMap[item] = item
 		}
 	}
-
-	uniqueList := make([]string, 0, len(uniqueSet))
-	for item := range uniqueSet {
-		uniqueList = append(uniqueList, item)
-	}
-
-	return uniqueList
+	return uniqueMap
 }
 
 // convertNodePathToStringPath converts a path of graph.Nodes to a path of strings
@@ -205,4 +201,4 @@ func CalculateShortestPath(g *CallGraph, start, goal string) (int, error) {
 
 //buf := make([]byte, 1024)
 //n := runtime.Stack(buf, false)
-//log.Logf(0, "stack trace: %s", string(buf[:n]))
+//fmt.Printf("stack trace: %s", string(buf[:n]))

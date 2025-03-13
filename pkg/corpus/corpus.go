@@ -33,6 +33,10 @@ type Corpus struct {
 	StatCover  *stat.Val
 
 	focusAreas []*focusAreaState
+
+	CallGraph      *mgrconfig.CallGraph
+	FunctoinNames  map[uint64]string
+	TargetFunction string
 }
 
 type focusAreaState struct {
@@ -46,7 +50,7 @@ type FocusArea struct {
 	Weight         float64
 	Foobar         int64
 	CallGraph      *mgrconfig.CallGraph
-	FunctoinNames  map[uint64]string
+	FunctionNames  map[uint64]string
 	TargetFunction string
 }
 
@@ -71,6 +75,13 @@ func NewFocusedCorpus(ctx context.Context, updates chan<- NewItemEvent, areas []
 		stat.LenOf(&corpus.signal, &corpus.mu))
 	corpus.StatCover = stat.New("coverage", "Source coverage in the corpus", stat.Console,
 		stat.Link("/cover"), stat.Prometheus("syz_corpus_cover"), stat.LenOf(&corpus.cover, &corpus.mu))
+
+	// DGF: Set DGF data to access these from fuzzer
+	if len(areas) > 0 {
+		corpus.CallGraph = areas[0].CallGraph
+		corpus.FunctoinNames = areas[0].FunctionNames
+		corpus.TargetFunction = areas[0].TargetFunction
+	}
 
 	for _, area := range areas {
 		obj := &ProgramsList{}
@@ -214,11 +225,11 @@ func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
 		for _, pc := range coverDelta {
 			//fmt.Printf("DGF: DEBUG: check pc = 0x%x\n", pc)
 			if _, ok := area.CoverPCs[pc]; ok {
-				fmt.Printf("DGF: DEBUG: applyFocusAreas: matches function %v, PC = 0x%x\n", area.FunctoinNames[pc], pc)
+				fmt.Printf("DGF: DEBUG: applyFocusAreas: matches function %v, PC = 0x%x\n", area.FunctionNames[pc], pc)
 				matches = true
 				break
 			} else {
-				if start, ok := area.FunctoinNames[pc]; ok {
+				if start, ok := area.FunctionNames[pc]; ok {
 					d, err := mgrconfig.CalculateShortestPath(area.CallGraph, start, area.TargetFunction)
 					if err == nil {
 						if d < 10 {
@@ -226,21 +237,19 @@ func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
 							interesting = true
 							break
 						} else {
-							//fmt.Printf("DGF: DEBUG: unknown pc 0x%x\n", pc)
+							// fmt.Printf("DGF: DEBUG: not apply %s : pc 0x%x\n", start, pc)
 						}
 					}
 				}
 			}
 
-			if !matches && !interesting {
-				continue
-			}
-
-			ret = true
-			area.saveProgram(item.Prog, item.Signal)
-			if item.areas == nil {
-				item.areas = make(map[*focusAreaState]struct{})
-				item.areas[area] = struct{}{}
+			if matches || interesting {
+				ret = true
+				area.saveProgram(item.Prog, item.Signal)
+				if item.areas == nil {
+					item.areas = make(map[*focusAreaState]struct{})
+					item.areas[area] = struct{}{}
+				}
 			}
 		}
 	}
