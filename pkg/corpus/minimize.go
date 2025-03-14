@@ -41,7 +41,7 @@ func (corpus *Corpus) Minimize(cover bool) {
 
 	// Overwrite the program lists.
 	corpus.ProgramsList = &ProgramsList{}
-	for _, area := range corpus.focusAreas {
+	for _, area := range corpus.FocusAreas {
 		area.ProgramsList = &ProgramsList{}
 	}
 	for _, ctx := range signal.Minimize(inputs) {

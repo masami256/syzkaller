@@ -47,10 +47,10 @@ func (corpus *Corpus) ChooseProgram(r *rand.Rand) *prog.Prog {
 	// We could have used an approach similar to chooseProgram(), but for small number
 	// of focus areas that is an overkill.
 	var randArea *focusAreaState
-	if len(corpus.focusAreas) > 0 {
+	if len(corpus.FocusAreas) > 0 {
 		sum := 0.0
-		nonEmpty := make([]*focusAreaState, 0, len(corpus.focusAreas))
-		for _, area := range corpus.focusAreas {
+		nonEmpty := make([]*focusAreaState, 0, len(corpus.FocusAreas))
+		for _, area := range corpus.FocusAreas {
 			if len(area.progs) == 0 {
 				continue
 			}

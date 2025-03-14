@@ -139,26 +139,16 @@ func (fuzzer *Fuzzer) processResult(req *queue.Request, res *queue.Result, flags
 	// it may result it concurrent modification of req.Prog.
 	var triage map[int]*triageCall
 	if req.ExecOpts.ExecFlags&flatrpc.ExecFlagCollectSignal > 0 && res.Info != nil && !dontTriage {
-		// DGF: TODO calucarate distance
-		// DGF
-		//fuzzer.Config.Corpus.CallGraph
+		// DGF: Check if pc is in the list of functions to be covered
 		for call, info := range res.Info.Calls {
-			if len(info.Cover) == 0 {
-				continue
+			for _, pc := range info.Cover {
+				if funcName, ok := fuzzer.Config.Corpus.FocusAreas[0].FunctionNames[pc]; ok {
+					fmt.Printf("DGF: DEBUG: processResult: found function %s : pc 0x%x\n", funcName, pc)
+					fuzzer.triageProgCall(req.Prog, info, call, &triage)
+				}
 			}
-			//fuzzer.Config.Corpus.FunctoinNames
-
-			fmt.Printf("DGF: processResult: names len = %d\n", len(fuzzer.Config.Corpus.FunctoinNames))
-			// for _, funcName := range fuzzer.Config.Corpus.FunctoinNames {
-			// 	fmt.Printf("DGF: DEBUG: processResult: found function %s\n", funcName)
-			// }
-			// for _, pc := range info.Cover {
-			// 	if funcName, ok := fuzzer.Config.Corpus.FunctoinNames[pc]; ok {
-			// 		fmt.Printf("DGF: DEBUG: processResult: found function %s : pc 0x%x\n", funcName, pc)
-			// 	}
-			// }
-			fuzzer.triageProgCall(req.Prog, info, call, &triage)
 		}
+
 		fuzzer.triageProgCall(req.Prog, res.Info.Extra, -1, &triage)
 
 		if len(triage) != 0 {

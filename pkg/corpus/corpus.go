@@ -32,11 +32,7 @@ type Corpus struct {
 	StatSignal *stat.Val
 	StatCover  *stat.Val
 
-	focusAreas []*focusAreaState
-
-	CallGraph      *mgrconfig.CallGraph
-	FunctoinNames  map[uint64]string
-	TargetFunction string
+	FocusAreas []*focusAreaState
 }
 
 type focusAreaState struct {
@@ -45,13 +41,15 @@ type focusAreaState struct {
 }
 
 type FocusArea struct {
-	Name           string // can be empty
-	CoverPCs       map[uint64]struct{}
-	Weight         float64
-	Foobar         int64
-	CallGraph      *mgrconfig.CallGraph
-	FunctionNames  map[uint64]string
-	TargetFunction string
+	Name            string // can be empty
+	CoverPCs        map[uint64]struct{}
+	Weight          float64
+	Foobar          int64
+	CallGraph       *mgrconfig.CallGraph
+	FunctionNames   map[uint64]string
+	TargetFunction  string
+	FunctionsInPath map[string]string
+	TargetPaths     [][]string
 }
 
 func NewCorpus(ctx context.Context) *Corpus {
@@ -76,13 +74,6 @@ func NewFocusedCorpus(ctx context.Context, updates chan<- NewItemEvent, areas []
 	corpus.StatCover = stat.New("coverage", "Source coverage in the corpus", stat.Console,
 		stat.Link("/cover"), stat.Prometheus("syz_corpus_cover"), stat.LenOf(&corpus.cover, &corpus.mu))
 
-	// DGF: Set DGF data to access these from fuzzer
-	if len(areas) > 0 {
-		corpus.CallGraph = areas[0].CallGraph
-		corpus.FunctoinNames = areas[0].FunctionNames
-		corpus.TargetFunction = areas[0].TargetFunction
-	}
-
 	for _, area := range areas {
 		obj := &ProgramsList{}
 		if len(areas) > 1 && area.Name != "" {
@@ -93,7 +84,7 @@ func NewFocusedCorpus(ctx context.Context, updates chan<- NewItemEvent, areas []
 				stat.Console, stat.Graph("corpus"),
 				stat.LenOf(&obj.progs, &corpus.mu))
 		}
-		corpus.focusAreas = append(corpus.focusAreas, &focusAreaState{
+		corpus.FocusAreas = append(corpus.FocusAreas, &focusAreaState{
 			FocusArea:    area,
 			ProgramsList: obj,
 		})
@@ -218,7 +209,7 @@ func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
 	ret := false
 
 	// DGF: Check if the coverDelta matches any of the focus areas
-	for _, area := range corpus.focusAreas {
+	for _, area := range corpus.FocusAreas {
 		matches := false
 		interesting := false
 

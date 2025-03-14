@@ -275,7 +275,7 @@ func checkNonEmpty(fields ...string) error {
 }
 
 func (cov *CovFilterCfg) Empty() bool {
-	return len(cov.Functions)+len(cov.Files)+len(cov.RawPCs) == 0
+	return len(cov.FunctionsInPath)+len(cov.Files)+len(cov.RawPCs) == 0
 }
 
 // DGF

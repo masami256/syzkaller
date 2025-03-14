@@ -296,10 +296,10 @@ type Subsystem struct {
 }
 
 type CovFilterCfg struct {
-	Files          []string `json:"files,omitempty"`
-	Functions      []string `json:"functions,omitempty"`
-	RawPCs         []string `json:"pcs,omitempty"`
-	TargetFunction []string
+	Files           []string `json:"files,omitempty"`
+	FunctionsInPath []string `json:"functions,omitempty"`
+	RawPCs          []string `json:"pcs,omitempty"`
+	TargetFunction  []string
 	// DGF:
 	CallGraph   *CallGraph
 	TargetPaths [][]string
