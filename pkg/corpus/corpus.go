@@ -41,9 +41,16 @@ type focusAreaState struct {
 }
 
 type FocusArea struct {
-	Name            string // can be empty
-	CoverPCs        map[uint64]struct{}
-	Weight          float64
+	Name     string // can be empty
+	CoverPCs map[uint64]struct{}
+	Weight   float64
+	DgfData  DgfData
+}
+
+type DgfData struct {
+	// DGF: These are the fields that are used to determine if a program is interesting
+	PrevDistance    int
+	Interesting     bool
 	Foobar          int64
 	CallGraph       *mgrconfig.CallGraph
 	FunctionNames   map[uint64]string
@@ -67,6 +74,7 @@ func NewFocusedCorpus(ctx context.Context, updates chan<- NewItemEvent, areas []
 		updates:      updates,
 		ProgramsList: &ProgramsList{},
 	}
+
 	corpus.StatProgs = stat.New("corpus", "Number of test programs in the corpus", stat.Console,
 		stat.Link("/corpus"), stat.Graph("corpus"), stat.LenOf(&corpus.progsMap, &corpus.mu))
 	corpus.StatSignal = stat.New("signal", "Fuzzing signal in the corpus",
@@ -216,15 +224,15 @@ func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
 		for _, pc := range coverDelta {
 			//fmt.Printf("DGF: DEBUG: check pc = 0x%x\n", pc)
 			if _, ok := area.CoverPCs[pc]; ok {
-				fmt.Printf("DGF: DEBUG: applyFocusAreas: matches function %v, PC = 0x%x\n", area.FunctionNames[pc], pc)
+				fmt.Printf("DGF: DEBUG: applyFocusAreas: matches function %v, PC = 0x%x\n", area.DgfData.FunctionNames[pc], pc)
 				matches = true
 				break
 			} else {
-				if start, ok := area.FunctionNames[pc]; ok {
-					d, err := mgrconfig.CalculateShortestPath(area.CallGraph, start, area.TargetFunction)
+				if start, ok := area.DgfData.FunctionNames[pc]; ok {
+					d, err := mgrconfig.CalculateShortestPath(area.DgfData.CallGraph, start, area.DgfData.TargetFunction)
 					if err == nil {
 						if d < 10 {
-							fmt.Printf("DGF: DEBUG: applyFocusAreas: distance from %v to %v is %d\n", start, area.TargetFunction, d)
+							fmt.Printf("DGF: DEBUG: applyFocusAreas: distance from %v to %v is %d\n", start, area.DgfData.TargetFunction, d)
 							interesting = true
 							break
 						} else {

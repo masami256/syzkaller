@@ -247,18 +247,26 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 			covNames[next] = funcName
 		}
 
-		// DGF: Set focus area to Corpus.FocusArea definfed in pkg/corpus/corpus.go at line 42
-		ret.Areas = append(ret.Areas, corpus.FocusArea{
-			Name:            area.Name,
-			CoverPCs:        covPCs,
-			Weight:          area.Weight,
-			Foobar:          area.Foobar,
+		dgfData := corpus.DgfData{
+			PrevDistance:    0xffffffff,
+			Interesting:     false,
+			Foobar:          42,
 			CallGraph:       cfg.CovFilter.CallGraph,
 			FunctionNames:   covNames,
 			TargetFunction:  cfg.Experimental.DirectedGreyboxFuzzing.FunctionName,
 			FunctionsInPath: convertSliceToMap(area.Filter.FunctionsInPath),
 			TargetPaths:     area.Filter.TargetPaths,
+		}
+
+		ret.Areas = append(ret.Areas, corpus.FocusArea{
+			Name:     area.Name,
+			CoverPCs: covPCs,
+			Weight:   area.Weight,
+			DgfData:  dgfData,
 		})
+
+		// DGF: Set focus area to Corpus.FocusArea definfed in pkg/corpus/corpus.go at line 42
+
 		if area.Filter.Empty() && area.Filter.EmptyDFG() {
 			// An empty cover filter indicates that the user is interested in all the coverage.
 			needExecutorFilter = false
@@ -271,9 +279,6 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 				ret.ExecutorFilter[pc] = struct{}{}
 			}
 		}
-	}
-	for _, funcName := range ret.Areas[0].FunctionsInPath {
-		fmt.Printf("DGF: DEBUG: ret.Areas[0].FunctionsInPath: %v\n", funcName)
 	}
 
 	return ret, nil

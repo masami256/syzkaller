@@ -143,14 +143,12 @@ func (fuzzer *Fuzzer) processResult(req *queue.Request, res *queue.Result, flags
 		// DGF: Check if pc is in the list of functions to be covered
 		for call, info := range res.Info.Calls {
 			for _, pc := range info.Cover {
-				if funcName, ok := fuzzer.Config.Corpus.FocusAreas[0].FunctionNames[pc]; ok {
-					if pathFuncName, ok := fuzzer.Config.Corpus.FocusAreas[0].FunctionsInPath[funcName]; ok {
-						if _, ok := fuzzer.interestingFunctions[pathFuncName]; !ok {
-							fuzzer.interestingFunctions[pathFuncName] = funcName
-							fuzzer.Logf(0, "DGF: DEBUG: processResult: found function %s", pathFuncName)
-						}
-						fuzzer.triageProgCall(req.Prog, info, call, &triage)
+				if funcName, ok := fuzzer.Config.Corpus.FocusAreas[0].DgfData.FunctionNames[pc]; ok {
+					if _, ok := fuzzer.interestingFunctions[funcName]; ok {
+						fmt.Printf("DGF: DEBUG: processResult: %s:0x%x is in the list of functions to be covered\n", funcName, pc)
+						continue
 					}
+					fuzzer.triageProgCallForDGF(funcName, req.Prog, info, call, &triage)
 				}
 			}
 		}
@@ -248,6 +246,55 @@ func (fuzzer *Fuzzer) triageProgCall(p *prog.Prog, info *flatrpc.CallInfo, call 
 	}
 }
 
+func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *flatrpc.CallInfo, call int, triage *map[int]*triageCall) {
+	fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting = false
+	fmt.Printf("DGF: DEBUG: triageProgCallForDGF: funcName is %s\n", funcName)
+	if info == nil {
+		return
+	}
+
+	// DGF: Check if pc is in the list of functions to be covered
+	if _, ok := fuzzer.interestingFunctions[funcName]; ok {
+		return
+	}
+
+	d, err := mgrconfig.CalculateShortestPath(fuzzer.Config.Corpus.FocusAreas[0].DgfData.CallGraph,
+		funcName, fuzzer.Config.Corpus.FocusAreas[0].DgfData.TargetFunction)
+	if err == nil {
+		if d < 10 && d < fuzzer.Config.Corpus.FocusAreas[0].DgfData.PrevDistance {
+			fuzzer.Config.Corpus.FocusAreas[0].DgfData.PrevDistance = d
+
+			fuzzer.interestingFunctions[funcName] = funcName
+
+			fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting = true
+			fuzzer.Logf(0, "DGF: DEBUG: processResult: distance from %s to %s is %d",
+				funcName, fuzzer.Config.Corpus.FocusAreas[0].DgfData.TargetFunction, d)
+		}
+	}
+
+	prio := signalPrio(p, info, call)
+	newMaxSignal := fuzzer.Cover.addRawMaxSignal(info.Signal, prio)
+	if newMaxSignal.Empty() && !fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting {
+		fuzzer.Logf(0, "DGF: function %s: newMaxSignal is %v and interesting is %v", funcName, newMaxSignal.Empty(), fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting)
+		return
+	}
+	if !fuzzer.Config.NewInputFilter(p.CallName(call)) {
+		fuzzer.Logf(0, "DGF: function %s: NewInputFilter is false", funcName)
+		return
+	}
+	fuzzer.Logf(2, "found new signal/interesting in call %d in %s", call, p)
+	if *triage == nil {
+		*triage = make(map[int]*triageCall)
+	}
+	(*triage)[call] = &triageCall{
+		errno:     info.Error,
+		newSignal: newMaxSignal,
+		signals:   [deflakeNeedRuns]signal.Signal{signal.FromRaw(info.Signal, prio)},
+	}
+
+	fuzzer.Logf(0, "DGF: found interesting function %s", funcName)
+}
+
 func (fuzzer *Fuzzer) handleCallInfo(req *queue.Request, info *flatrpc.CallInfo, call int) {
 	if info == nil || info.Flags&flatrpc.CallFlagCoverageOverflow == 0 {
 		return
@@ -295,7 +342,7 @@ func (fuzzer *Fuzzer) genFuzz() *queue.Request {
 	}
 
 	// Assign energy to the generated request
-	energy := assignEnergy(req)
+	energy := assignEnergy(req, fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting)
 	for i := 0; i < energy; i++ {
 		mutatedReq := mutateProgRequest(fuzzer, rnd)
 		if mutatedReq == nil {
@@ -383,7 +430,7 @@ func (fuzzer *Fuzzer) AddCandidates(candidates []Candidate) {
 			Stat:      fuzzer.statExecCandidate,
 			Important: true,
 		}
-		energy := assignEnergy(req)
+		energy := assignEnergy(req, fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting)
 		for i := 0; i < energy; i++ {
 			mutatedReq := mutateProgRequest(fuzzer, fuzzer.rnd)
 			if mutatedReq == nil {
@@ -509,7 +556,10 @@ func DefaultExecOpts(cfg *mgrconfig.Config, features flatrpc.Feature, debug bool
 	}
 }
 
-func assignEnergy(req *queue.Request) int {
+func assignEnergy(req *queue.Request, interesting bool) int {
 	// Assign energy to the generated request.
+	if interesting {
+		return 1
+	}
 	return 1
 }
