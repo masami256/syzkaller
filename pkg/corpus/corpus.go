@@ -44,7 +44,7 @@ type FocusArea struct {
 	Name     string // can be empty
 	CoverPCs map[uint64]struct{}
 	Weight   float64
-	DgfData  DgfData
+	DgfData  *DgfData
 }
 
 type DgfData struct {

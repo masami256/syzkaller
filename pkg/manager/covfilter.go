@@ -247,7 +247,7 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 			covNames[next] = funcName
 		}
 
-		dgfData := corpus.DgfData{
+		dgfData := &corpus.DgfData{
 			PrevDistance:    0xffffffff,
 			Interesting:     false,
 			Foobar:          42,
