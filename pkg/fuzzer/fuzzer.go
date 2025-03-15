@@ -34,11 +34,11 @@ type Fuzzer struct {
 	hintsLimiter prog.HintsLimiter
 	runningJobs  map[jobIntrospector]struct{}
 
-	ct           *prog.ChoiceTable
-	ctProgs      int
-	ctMu         sync.Mutex // TODO: use RWLock.
-	ctRegenerate chan struct{}
-
+	ct                   *prog.ChoiceTable
+	ctProgs              int
+	ctMu                 sync.Mutex // TODO: use RWLock.
+	ctRegenerate         chan struct{}
+	interestingFunctions map[string]string
 	execQueues
 }
 
@@ -61,7 +61,8 @@ func NewFuzzer(ctx context.Context, cfg *Config, rnd *rand.Rand,
 
 		// We're okay to lose some of the messages -- if we are already
 		// regenerating the table, we don't want to repeat it right away.
-		ctRegenerate: make(chan struct{}),
+		ctRegenerate:         make(chan struct{}),
+		interestingFunctions: make(map[string]string),
 	}
 	f.execQueues = newExecQueues(f)
 	f.updateChoiceTable(nil)
@@ -143,8 +144,13 @@ func (fuzzer *Fuzzer) processResult(req *queue.Request, res *queue.Result, flags
 		for call, info := range res.Info.Calls {
 			for _, pc := range info.Cover {
 				if funcName, ok := fuzzer.Config.Corpus.FocusAreas[0].FunctionNames[pc]; ok {
-					fmt.Printf("DGF: DEBUG: processResult: found function %s : pc 0x%x\n", funcName, pc)
-					fuzzer.triageProgCall(req.Prog, info, call, &triage)
+					if pathFuncName, ok := fuzzer.Config.Corpus.FocusAreas[0].FunctionsInPath[funcName]; ok {
+						if _, ok := fuzzer.interestingFunctions[pathFuncName]; !ok {
+							fuzzer.interestingFunctions[pathFuncName] = funcName
+							fuzzer.Logf(0, "DGF: DEBUG: processResult: found function %s", pathFuncName)
+						}
+						fuzzer.triageProgCall(req.Prog, info, call, &triage)
+					}
 				}
 			}
 		}

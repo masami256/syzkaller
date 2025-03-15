@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/google/syzkaller/pkg/corpus"
 	"github.com/google/syzkaller/pkg/cover/backend"
@@ -18,7 +17,7 @@ import (
 	"github.com/google/syzkaller/pkg/mgrconfig"
 )
 
-func CoverageFilter(source *ReportGeneratorWrapper, covCfg mgrconfig.CovFilterCfg,
+func CoverageFilter(source *ReportGeneratorWrapper, covCfg *mgrconfig.CovFilterCfg,
 	strict bool) (map[uint64]struct{}, map[uint64]string, error) {
 	if covCfg.Empty() && covCfg.EmptyDFG() {
 		return nil, nil, nil
@@ -129,7 +128,7 @@ func covFilterAddRawPCs(pcs map[uint64]struct{}, rawPCsFiles []string) error {
 }
 
 func covFilterAddDirectedPcs(pcs map[uint64]struct{}, names map[uint64]string,
-	covCfg mgrconfig.CovFilterCfg, foreach func(func(*backend.ObjectUnit)),
+	covCfg *mgrconfig.CovFilterCfg, foreach func(func(*backend.ObjectUnit)),
 	strict bool) error {
 
 	target_function := covCfg.TargetFunction
@@ -180,7 +179,7 @@ func covFilterAddDirectedPcs(pcs map[uint64]struct{}, names map[uint64]string,
 
 					//if _, ok := unique_function_names_in_path[unit.Name]; ok {
 					names[pc] = unit.Name
-					//log.Logf(0, "DGF: DEBUG: Adding %v:0x%x to the list of functions to be covered", unit.Name, pc)
+					log.Logf(0, "DGF: DEBUG: Adding %v:0x%x to the list of functions to be covered", unit.Name, pc)
 					//}
 				}
 				for _, pc := range unit.CMPs {
@@ -200,9 +199,9 @@ func covFilterAddDirectedPcs(pcs map[uint64]struct{}, names map[uint64]string,
 		//return fmt.Errorf("some filters don't match anything")
 		log.Logf(0, "some filters don't match anything")
 	}
-	fmt.Printf("DGF: covFilterAddDirectedPcs: names len = %d\n", len(names))
 
 	covCfg.FunctionsInPath = uniq_function_names_tmp
+
 	return nil
 }
 
@@ -230,7 +229,7 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 	needExecutorFilter := len(cfg.Experimental.FocusAreas) > 0
 
 	for _, area := range cfg.Experimental.FocusAreas {
-		pcs, names, err := CoverageFilter(source, area.Filter, strict)
+		pcs, names, err := CoverageFilter(source, &area.Filter, strict)
 		if err != nil {
 			return ret, err
 		}
@@ -273,21 +272,20 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 			}
 		}
 	}
+	for _, funcName := range ret.Areas[0].FunctionsInPath {
+		fmt.Printf("DGF: DEBUG: ret.Areas[0].FunctionsInPath: %v\n", funcName)
+	}
 
-	fmt.Printf("DGF: PrepareCoverageFilters: FunctionNames len = %d\n", len(ret.Areas[0].FunctionNames))
 	return ret, nil
 }
 
 // ConvertSliceToMap converts a slice of strings into a map using ":" as a delimiter.
 func convertSliceToMap(slice []string) map[string]string {
 	result := make(map[string]string)
-
-	for _, item := range slice {
-		parts := strings.SplitN(item, ":", 2) // Only split at the first occurrence of ":"
-		if len(parts) == 2 {
-			result[parts[0]] = parts[1]
+	for _, funcName := range slice {
+		if _, ok := result[funcName]; !ok {
+			result[funcName] = funcName
 		}
 	}
-
 	return result
 }
