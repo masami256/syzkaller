@@ -49,14 +49,15 @@ type FocusArea struct {
 
 type DgfData struct {
 	// DGF: These are the fields that are used to determine if a program is interesting
-	PrevDistance    int
-	Interesting     bool
-	Foobar          int64
-	CallGraph       *mgrconfig.CallGraph
-	FunctionNames   map[uint64]string
-	TargetFunction  string
-	FunctionsInPath map[string]string
-	TargetPaths     [][]string
+	PrevDistance        int
+	Interesting         bool
+	Foobar              int64
+	CallGraph           *mgrconfig.CallGraph
+	FunctionNames       map[uint64]string
+	TargetFunction      string
+	FunctionsInPath     map[string]string
+	TargetPaths         [][]string
+	InterestingFunction string
 }
 
 func NewCorpus(ctx context.Context) *Corpus {
@@ -219,30 +220,31 @@ func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
 	// DGF: Check if the coverDelta matches any of the focus areas
 	for _, area := range corpus.FocusAreas {
 		matches := false
-		interesting := false
 
 		for _, pc := range coverDelta {
-			//fmt.Printf("DGF: DEBUG: check pc = 0x%x\n", pc)
 			if _, ok := area.CoverPCs[pc]; ok {
-				fmt.Printf("DGF: DEBUG: applyFocusAreas: matches function %v, PC = 0x%x\n", area.DgfData.FunctionNames[pc], pc)
-				matches = true
-				break
-			} else {
-				if start, ok := area.DgfData.FunctionNames[pc]; ok {
-					d, err := mgrconfig.CalculateShortestPath(area.DgfData.CallGraph, start, area.DgfData.TargetFunction)
-					if err == nil {
-						if d < 10 {
-							fmt.Printf("DGF: DEBUG: applyFocusAreas: distance from %v to %v is %d\n", start, area.DgfData.TargetFunction, d)
-							interesting = true
-							break
-						} else {
-							// fmt.Printf("DGF: DEBUG: not apply %s : pc 0x%x\n", start, pc)
-						}
-					}
+				if area.DgfData.FunctionNames[pc] == area.DgfData.InterestingFunction {
+					fmt.Printf("DGF: DEBUG: applyFocusAreas: matches function %v, PC = 0x%x\n", area.DgfData.FunctionNames[pc], pc)
+					matches = true
+					break
 				}
 			}
+			// else {
+			// 	if start, ok := area.DgfData.FunctionNames[pc]; ok {
+			// 		d, err := mgrconfig.CalculateShortestPath(area.DgfData.CallGraph, start, area.DgfData.TargetFunction)
+			// 		if err == nil {
+			// 			if d < 10 {
+			// 				fmt.Printf("DGF: DEBUG: applyFocusAreas: distance from %v to %v is %d\n", start, area.DgfData.TargetFunction, d)
+			// 				interesting = true
+			// 				break
+			// 			} else {
+			// 				// fmt.Printf("DGF: DEBUG: not apply %s : pc 0x%x\n", start, pc)
+			// 			}
+			// 		}
+			// 	}
+			// }
 
-			if matches || interesting {
+			if matches {
 				ret = true
 				area.saveProgram(item.Prog, item.Signal)
 				if item.areas == nil {

@@ -145,7 +145,7 @@ func (fuzzer *Fuzzer) processResult(req *queue.Request, res *queue.Result, flags
 			for _, pc := range info.Cover {
 				if funcName, ok := fuzzer.Config.Corpus.FocusAreas[0].DgfData.FunctionNames[pc]; ok {
 					if _, ok := fuzzer.interestingFunctions[funcName]; ok {
-						fmt.Printf("DGF: DEBUG: processResult: %s:0x%x is in the list of functions to be covered\n", funcName, pc)
+						//fmt.Printf("DGF: DEBUG: processResult: %s:0x%x is in the list\n", funcName, pc)
 						continue
 					}
 					fuzzer.triageProgCallForDGF(funcName, req.Prog, info, call, &triage)
@@ -248,7 +248,6 @@ func (fuzzer *Fuzzer) triageProgCall(p *prog.Prog, info *flatrpc.CallInfo, call 
 
 func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *flatrpc.CallInfo, call int, triage *map[int]*triageCall) {
 	fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting = false
-	fmt.Printf("DGF: DEBUG: triageProgCallForDGF: funcName is %s\n", funcName)
 	if info == nil {
 		return
 	}
@@ -275,7 +274,7 @@ func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *
 	prio := signalPrio(p, info, call)
 	newMaxSignal := fuzzer.Cover.addRawMaxSignal(info.Signal, prio)
 	if newMaxSignal.Empty() && !fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting {
-		fuzzer.Logf(0, "DGF: function %s: newMaxSignal is %v and interesting is %v", funcName, newMaxSignal.Empty(), fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting)
+		// fuzzer.Logf(0, "DGF: function %s: newMaxSignal is %v and interesting is %v", funcName, newMaxSignal.Empty(), fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting)
 		return
 	}
 	if !fuzzer.Config.NewInputFilter(p.CallName(call)) {
@@ -292,7 +291,9 @@ func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *
 		signals:   [deflakeNeedRuns]signal.Signal{signal.FromRaw(info.Signal, prio)},
 	}
 
-	fuzzer.Logf(0, "DGF: found interesting function %s", funcName)
+	fuzzer.Config.Corpus.FocusAreas[0].DgfData.InterestingFunction = funcName
+
+	fuzzer.Logf(0, "DGF: found interesting function %s: distance is %d", funcName, d)
 }
 
 func (fuzzer *Fuzzer) handleCallInfo(req *queue.Request, info *flatrpc.CallInfo, call int) {
