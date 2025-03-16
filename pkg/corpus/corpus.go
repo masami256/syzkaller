@@ -49,15 +49,14 @@ type FocusArea struct {
 
 type DgfData struct {
 	// DGF: These are the fields that are used to determine if a program is interesting
-	PrevDistance        int
-	Interesting         bool
-	Foobar              int64
-	CallGraph           *mgrconfig.CallGraph
-	FunctionNames       map[uint64]string
-	TargetFunction      string
-	FunctionsInPath     map[string]string
-	TargetPaths         [][]string
-	InterestingFunction string
+	PrevDistance         int
+	Foobar               int64
+	CallGraph            *mgrconfig.CallGraph
+	FunctionNames        map[uint64]string
+	TargetFunction       string
+	FunctionsInPath      map[string]string
+	TargetPaths          [][]string
+	InterestingFunctions map[string]string
 }
 
 func NewCorpus(ctx context.Context) *Corpus {
@@ -214,6 +213,30 @@ func (corpus *Corpus) Save(inp NewInput) {
 	}
 }
 
+func (corpus *Corpus) applyFocusAreas2(item *Item, coverDelta []uint64) bool {
+	ret := false
+	for _, area := range corpus.FocusAreas {
+		matches := false
+		for _, pc := range coverDelta {
+			if _, ok := area.CoverPCs[pc]; ok {
+				matches = true
+				ret = true
+				break
+			}
+		}
+		if !matches {
+			continue
+		}
+		area.saveProgram(item.Prog, item.Signal)
+		if item.areas == nil {
+			item.areas = make(map[*focusAreaState]struct{})
+			item.areas[area] = struct{}{}
+		}
+	}
+
+	return ret
+}
+
 func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
 	ret := false
 
@@ -223,7 +246,7 @@ func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) bool {
 
 		for _, pc := range coverDelta {
 			if _, ok := area.CoverPCs[pc]; ok {
-				if area.DgfData.FunctionNames[pc] == area.DgfData.InterestingFunction {
+				if _, ok := area.DgfData.InterestingFunctions[area.DgfData.FunctionNames[pc]]; ok {
 					fmt.Printf("DGF: DEBUG: applyFocusAreas: matches function %v, PC = 0x%x\n", area.DgfData.FunctionNames[pc], pc)
 					matches = true
 					break

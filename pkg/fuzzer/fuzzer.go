@@ -139,18 +139,26 @@ func (fuzzer *Fuzzer) processResult(req *queue.Request, res *queue.Result, flags
 	// We do it before unblocking the waiting threads because
 	// it may result it concurrent modification of req.Prog.
 	var triage map[int]*triageCall
+	interesting := false
+
 	if req.ExecOpts.ExecFlags&flatrpc.ExecFlagCollectSignal > 0 && res.Info != nil && !dontTriage {
 		// DGF: Check if pc is in the list of functions to be covered
 		for call, info := range res.Info.Calls {
 			for _, pc := range info.Cover {
 				if funcName, ok := fuzzer.Config.Corpus.FocusAreas[0].DgfData.FunctionNames[pc]; ok {
-					if _, ok := fuzzer.interestingFunctions[funcName]; ok {
-						//fmt.Printf("DGF: DEBUG: processResult: %s:0x%x is in the list\n", funcName, pc)
-						continue
-					}
-					fuzzer.triageProgCallForDGF(funcName, req.Prog, info, call, &triage)
+					// if _, ok := fuzzer.interestingFunctions[funcName]; ok {
+					// 	//fmt.Printf("DGF: DEBUG: processResult: %s:0x%x is in the list\n", funcName, pc)
+					// 	continue
+					// }
+					fuzzer.mu.Lock()
+					interesting = interesting || fuzzer.triageProgCallForDGF(funcName, req.Prog, info, call, &triage)
+					fuzzer.mu.Unlock()
 				}
 			}
+		}
+
+		if !interesting {
+			return false
 		}
 
 		fuzzer.triageProgCall(req.Prog, res.Info.Extra, -1, &triage)
@@ -189,6 +197,7 @@ func (fuzzer *Fuzzer) processResult(req *queue.Request, res *queue.Result, flags
 
 	// Corpus candidates may have flaky coverage, so we give them a second chance.
 	maxCandidateAttempts := 3
+
 	if req.Risky() {
 		// In non-snapshot mode usually we are not sure which exactly input caused the crash,
 		// so give it one more chance. In snapshot mode we know for sure, so don't retry.
@@ -197,10 +206,12 @@ func (fuzzer *Fuzzer) processResult(req *queue.Request, res *queue.Result, flags
 			maxCandidateAttempts = 0
 		}
 	}
+
 	if len(triage) == 0 && flags&ProgFromCorpus != 0 && attempt < maxCandidateAttempts {
 		fuzzer.enqueue(fuzzer.candidateQueue, req, flags, attempt+1)
 		return false
 	}
+
 	if flags&progCandidate != 0 {
 		fuzzer.statCandidates.Add(-1)
 	}
@@ -246,42 +257,42 @@ func (fuzzer *Fuzzer) triageProgCall(p *prog.Prog, info *flatrpc.CallInfo, call 
 	}
 }
 
-func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *flatrpc.CallInfo, call int, triage *map[int]*triageCall) {
-	fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting = false
+func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *flatrpc.CallInfo, call int, triage *map[int]*triageCall) bool {
+	interesting := false
 	if info == nil {
-		return
-	}
-
-	// DGF: Check if pc is in the list of functions to be covered
-	if _, ok := fuzzer.interestingFunctions[funcName]; ok {
-		return
+		return false
 	}
 
 	d, err := mgrconfig.CalculateShortestPath(fuzzer.Config.Corpus.FocusAreas[0].DgfData.CallGraph,
 		funcName, fuzzer.Config.Corpus.FocusAreas[0].DgfData.TargetFunction)
-	if err == nil {
-		if d < 10 && d < fuzzer.Config.Corpus.FocusAreas[0].DgfData.PrevDistance {
-			fuzzer.Config.Corpus.FocusAreas[0].DgfData.PrevDistance = d
 
-			fuzzer.interestingFunctions[funcName] = funcName
+	if err != nil {
+		return false
+	}
 
-			fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting = true
-			fuzzer.Logf(0, "DGF: DEBUG: processResult: distance from %s to %s is %d",
-				funcName, fuzzer.Config.Corpus.FocusAreas[0].DgfData.TargetFunction, d)
-		}
+	if d < 10 && d <= fuzzer.Config.Corpus.FocusAreas[0].DgfData.PrevDistance {
+		fuzzer.Config.Corpus.FocusAreas[0].DgfData.PrevDistance = d
+
+		fuzzer.interestingFunctions[funcName] = funcName
+
+		interesting = true
+		fuzzer.Logf(0, "DGF: DEBUG: processResult: distance from %s to %s is %d",
+			funcName, fuzzer.Config.Corpus.FocusAreas[0].DgfData.TargetFunction, d)
+	} else {
+		return false
 	}
 
 	prio := signalPrio(p, info, call)
 	newMaxSignal := fuzzer.Cover.addRawMaxSignal(info.Signal, prio)
-	if newMaxSignal.Empty() && !fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting {
+	if newMaxSignal.Empty() && !interesting {
 		// fuzzer.Logf(0, "DGF: function %s: newMaxSignal is %v and interesting is %v", funcName, newMaxSignal.Empty(), fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting)
-		return
+		return false
 	}
 	if !fuzzer.Config.NewInputFilter(p.CallName(call)) {
 		fuzzer.Logf(0, "DGF: function %s: NewInputFilter is false", funcName)
-		return
+		return false
 	}
-	fuzzer.Logf(2, "found new signal/interesting in call %d in %s", call, p)
+	fuzzer.Logf(0, "found new signal/interesting in call %d in %s", call, p)
 	if *triage == nil {
 		*triage = make(map[int]*triageCall)
 	}
@@ -291,9 +302,11 @@ func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *
 		signals:   [deflakeNeedRuns]signal.Signal{signal.FromRaw(info.Signal, prio)},
 	}
 
-	fuzzer.Config.Corpus.FocusAreas[0].DgfData.InterestingFunction = funcName
+	fuzzer.Config.Corpus.FocusAreas[0].DgfData.InterestingFunctions[funcName] = funcName
 
 	fuzzer.Logf(0, "DGF: found interesting function %s: distance is %d", funcName, d)
+
+	return true
 }
 
 func (fuzzer *Fuzzer) handleCallInfo(req *queue.Request, info *flatrpc.CallInfo, call int) {
@@ -343,7 +356,7 @@ func (fuzzer *Fuzzer) genFuzz() *queue.Request {
 	}
 
 	// Assign energy to the generated request
-	energy := assignEnergy(req, fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting)
+	energy := assignEnergy(req, true)
 	for i := 0; i < energy; i++ {
 		mutatedReq := mutateProgRequest(fuzzer, rnd)
 		if mutatedReq == nil {
@@ -431,7 +444,7 @@ func (fuzzer *Fuzzer) AddCandidates(candidates []Candidate) {
 			Stat:      fuzzer.statExecCandidate,
 			Important: true,
 		}
-		energy := assignEnergy(req, fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting)
+		energy := assignEnergy(req, true)
 		for i := 0; i < energy; i++ {
 			mutatedReq := mutateProgRequest(fuzzer, fuzzer.rnd)
 			if mutatedReq == nil {

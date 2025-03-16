@@ -1451,8 +1451,6 @@ func (mgr *Manager) CoverageFilter(modules []*vminfo.KernelModule) ([]uint64, er
 	}
 
 	mgr.coverFilters = filters
-	//log.Logf(0, "DGF: CallGraph: %v", mgr.cfg.CovFilter.CallGraph)
-	//log.Logf(0, "DGF: Callgraph data end")
 	mgr.http.Cover.Store(&manager.CoverageInfo{
 		Modules:         modules,
 		ReportGenerator: mgr.reportGenerator,
@@ -1462,6 +1460,7 @@ func (mgr *Manager) CoverageFilter(modules []*vminfo.KernelModule) ([]uint64, er
 	for pc := range filters.ExecutorFilter {
 		pcs = append(pcs, pc)
 	}
+
 	return pcs, nil
 }
 

@@ -248,14 +248,14 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 		}
 
 		dgfData := &corpus.DgfData{
-			PrevDistance:    0xffffffff,
-			Interesting:     false,
-			Foobar:          42,
-			CallGraph:       cfg.CovFilter.CallGraph,
-			FunctionNames:   covNames,
-			TargetFunction:  cfg.Experimental.DirectedGreyboxFuzzing.FunctionName,
-			FunctionsInPath: convertSliceToMap(area.Filter.FunctionsInPath),
-			TargetPaths:     area.Filter.TargetPaths,
+			PrevDistance:         0xffffffff,
+			Foobar:               42,
+			CallGraph:            cfg.CovFilter.CallGraph,
+			FunctionNames:        covNames,
+			TargetFunction:       cfg.Experimental.DirectedGreyboxFuzzing.FunctionName,
+			FunctionsInPath:      convertSliceToMap(area.Filter.FunctionsInPath),
+			TargetPaths:          area.Filter.TargetPaths,
+			InterestingFunctions: make(map[string]string),
 		}
 
 		ret.Areas = append(ret.Areas, corpus.FocusArea{
