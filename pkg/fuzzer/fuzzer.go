@@ -276,8 +276,8 @@ func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *
 		fuzzer.interestingFunctions[funcName] = funcName
 
 		interesting = true
-		fuzzer.Logf(0, "DGF: DEBUG: processResult: distance from %s to %s is %d",
-			funcName, fuzzer.Config.Corpus.FocusAreas[0].DgfData.TargetFunction, d)
+		// fuzzer.Logf(0, "DGF: DEBUG: processResult: distance from %s to %s is %d",
+		// 	funcName, fuzzer.Config.Corpus.FocusAreas[0].DgfData.TargetFunction, d)
 	} else {
 		return false
 	}
@@ -292,7 +292,7 @@ func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *
 		fuzzer.Logf(0, "DGF: function %s: NewInputFilter is false", funcName)
 		return false
 	}
-	fuzzer.Logf(0, "found new signal/interesting in call %d in %s", call, p)
+	//fuzzer.Logf(0, "found new signal/interesting in call %d in %s", call, p)
 	if *triage == nil {
 		*triage = make(map[int]*triageCall)
 	}
@@ -302,9 +302,10 @@ func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *
 		signals:   [deflakeNeedRuns]signal.Signal{signal.FromRaw(info.Signal, prio)},
 	}
 
-	fuzzer.Config.Corpus.FocusAreas[0].DgfData.InterestingFunctions[funcName] = funcName
-
-	fuzzer.Logf(0, "DGF: found interesting function %s: distance is %d", funcName, d)
+	if _, ok := fuzzer.Config.Corpus.FocusAreas[0].DgfData.InterestingFunctions[funcName]; !ok {
+		fuzzer.Config.Corpus.FocusAreas[0].DgfData.InterestingFunctions[funcName] = funcName
+		fuzzer.Logf(0, "DGF: DEBUG: processResult: Added interesting function %s: distance is %d", funcName, d)
+	}
 
 	return true
 }
@@ -354,18 +355,6 @@ func (fuzzer *Fuzzer) genFuzz() *queue.Request {
 	if req == nil {
 		req = genProgRequest(fuzzer, rnd)
 	}
-
-	// Assign energy to the generated request
-	energy := assignEnergy(req, true)
-	for i := 0; i < energy; i++ {
-		mutatedReq := mutateProgRequest(fuzzer, rnd)
-		if mutatedReq == nil {
-			mutatedReq = genProgRequest(fuzzer, rnd)
-		}
-		//fuzzer.Logf(0, "DGF: DEBUG: genFuzz(): Mutated request %d/%d: %s", i+1, energy, mutatedReq.Prog)
-		fuzzer.prepare(mutatedReq, 0, 0)
-	}
-
 	if fuzzer.Config.Collide && rnd.Intn(3) == 0 {
 		req = &queue.Request{
 			Prog: randomCollide(req.Prog, rnd),
