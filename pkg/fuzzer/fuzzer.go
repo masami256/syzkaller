@@ -278,9 +278,10 @@ func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *
 		interesting = true
 		// fuzzer.Logf(0, "DGF: DEBUG: processResult: distance from %s to %s is %d",
 		// 	funcName, fuzzer.Config.Corpus.FocusAreas[0].DgfData.TargetFunction, d)
-	} else {
-		return false
 	}
+	// else {
+	// 	return false
+	// }
 
 	prio := signalPrio(p, info, call)
 	newMaxSignal := fuzzer.Cover.addRawMaxSignal(info.Signal, prio)
@@ -524,8 +525,16 @@ func (fuzzer *Fuzzer) logCurrentStats() {
 }
 
 func setFlags(execFlags flatrpc.ExecFlag) flatrpc.ExecOpts {
+	if execFlags&flatrpc.ExecFlagCollectComps == 0 {
+		// buf := make([]byte, 1024)
+		// n := runtime.Stack(buf, false)
+		// fmt.Printf("stack trace: \n%s\n", string(buf[:n]))
+		return flatrpc.ExecOpts{
+			ExecFlags: execFlags | flatrpc.ExecFlagCollectCover | flatrpc.ExecFlagDedupCover,
+		}
+	}
 	return flatrpc.ExecOpts{
-		ExecFlags: execFlags | flatrpc.ExecFlagCollectCover | flatrpc.ExecFlagDedupCover,
+		ExecFlags: execFlags,
 	}
 }
 

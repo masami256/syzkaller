@@ -42,6 +42,7 @@ func (ji *JobInfo) ID() string {
 }
 
 func genProgRequest(fuzzer *Fuzzer, rnd *rand.Rand) *queue.Request {
+	fmt.Printf("DGF: DEBUG: genProgRequest\n")
 	p := fuzzer.target.Generate(rnd,
 		prog.RecommendedCalls,
 		fuzzer.ChoiceTable())
@@ -53,6 +54,7 @@ func genProgRequest(fuzzer *Fuzzer, rnd *rand.Rand) *queue.Request {
 }
 
 func mutateProgRequest(fuzzer *Fuzzer, rnd *rand.Rand) *queue.Request {
+	fmt.Printf("DGF: DEBUG: mutateProgRequest\n")
 	p := fuzzer.Config.Corpus.ChooseProgram(rnd)
 	if p == nil {
 		return nil
@@ -225,7 +227,7 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
 
 func (job *triageJob) deflake(exec func(*queue.Request, ProgFlags) *queue.Result) (stop bool) {
 	job.info.Logf("deflake started")
-
+	fmt.Printf("DGF: DEBUG: deflake started\n")
 	avoid := []queue.ExecutorID{job.executor}
 	needRuns := deflakeNeedCorpusRuns
 	if job.fuzzer.Config.Snapshot {
@@ -347,6 +349,7 @@ func (job *triageJob) stopDeflake(run, needRuns int, noNewSignal bool) bool {
 
 func (job *triageJob) minimize(call int, info *triageCall) (*prog.Prog, int) {
 	job.info.Logf("[call #%d] minimize started", call)
+	fmt.Printf("DGF: DEBUG: minimize started\n")
 	minimizeAttempts := 3
 	if job.fuzzer.Config.Snapshot {
 		minimizeAttempts = 2
@@ -451,6 +454,7 @@ type smashJob struct {
 
 func (job *smashJob) run(fuzzer *Fuzzer) {
 	fuzzer.Logf(2, "smashing the program %s:", job.p)
+	fmt.Printf("DGF: DEBUG: smashJob.run\n")
 	job.info.Logf("\n%s", job.p.Serialize())
 
 	const iters = 25
@@ -534,6 +538,7 @@ type hintsJob struct {
 }
 
 func (job *hintsJob) run(fuzzer *Fuzzer) {
+	fmt.Printf("DGF: DEBUG: hintsJob.run\n")
 	// First execute the original program several times to get comparisons from KCOV.
 	// Additional executions lets us filter out flaky values, which seem to constitute ~30-40%.
 	p := job.p

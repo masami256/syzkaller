@@ -414,10 +414,12 @@ func (cfg *Config) completeDirectedGreyboxFuzzing() error {
 
 	cfg.Experimental.FocusAreas = []FocusArea{
 		{
-			Name:   "filtered",
+			Name:   "directed",
 			Filter: cfg.CovFilter,
 			Weight: 10.0,
-			Foobar: 42,
+		},
+		{
+			Weight: 0.1,
 		},
 	}
 

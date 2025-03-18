@@ -86,7 +86,6 @@ func NewFocusedCorpus(ctx context.Context, updates chan<- NewItemEvent, areas []
 		obj := &ProgramsList{}
 		if len(areas) > 1 && area.Name != "" {
 			// Only show extra statistics if there's more than one area.
-			fmt.Printf("DGF: DEBUG: Corpus programs of the focus area %q", area.Name)
 			stat.New("corpus ["+area.Name+"]",
 				fmt.Sprintf("Corpus programs of the focus area %q", area.Name),
 				stat.Console, stat.Graph("corpus"),
