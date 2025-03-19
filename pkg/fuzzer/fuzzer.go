@@ -139,27 +139,43 @@ func (fuzzer *Fuzzer) processResult(req *queue.Request, res *queue.Result, flags
 	// We do it before unblocking the waiting threads because
 	// it may result it concurrent modification of req.Prog.
 	var triage map[int]*triageCall
-	interesting := false
 
 	if req.ExecOpts.ExecFlags&flatrpc.ExecFlagCollectSignal > 0 && res.Info != nil && !dontTriage {
 		// DGF: Check if pc is in the list of functions to be covered
 		for call, info := range res.Info.Calls {
+			interesting := false
+			reachedFunction := ""
+
 			for _, pc := range info.Cover {
 				if funcName, ok := fuzzer.Config.Corpus.FocusAreas[0].DgfData.FunctionNames[pc]; ok {
-					// if _, ok := fuzzer.interestingFunctions[funcName]; ok {
-					// 	//fmt.Printf("DGF: DEBUG: processResult: %s:0x%x is in the list\n", funcName, pc)
-					// 	continue
-					// }
-					fuzzer.mu.Lock()
-					interesting = interesting || fuzzer.triageProgCallForDGF(funcName, req.Prog, info, call, &triage)
-					fuzzer.mu.Unlock()
+					reachedFunction = funcName
+					// fmt.Printf("DGF: DEBUG: processResult: reached function %s\n", reachedFunction)
+					if reachedFunction != "" {
+						fuzzer.mu.Lock()
+						interesting = interesting || fuzzer.triageProgCallForDGF(reachedFunction, req.Prog, info, call, &triage)
+						fuzzer.mu.Unlock()
+					}
+
 				}
 			}
+
+			// for _, pc := range info.Cover {
+			// 	if funcName, ok := fuzzer.Config.Corpus.FocusAreas[0].DgfData.FunctionNames[pc]; ok {
+			// 		reachedFunction = funcName
+			// 		// fmt.Printf("DGF: DEBUG: processResult: reached function %s\n", reachedFunction)
+			// 	}
+			// }
+
+			// if reachedFunction != "" {
+			// 	fuzzer.mu.Lock()
+			// 	interesting = interesting || fuzzer.triageProgCallForDGF(reachedFunction, req.Prog, info, call, &triage)
+			// 	fuzzer.mu.Unlock()
+			// }
 		}
 
-		if !interesting {
-			return false
-		}
+		// if !interesting {
+		// 	return false
+		// }
 
 		fuzzer.triageProgCall(req.Prog, res.Info.Extra, -1, &triage)
 
@@ -258,7 +274,7 @@ func (fuzzer *Fuzzer) triageProgCall(p *prog.Prog, info *flatrpc.CallInfo, call 
 }
 
 func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *flatrpc.CallInfo, call int, triage *map[int]*triageCall) bool {
-	interesting := false
+	// interesting := false
 	if info == nil {
 		return false
 	}
@@ -275,7 +291,7 @@ func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *
 
 		fuzzer.interestingFunctions[funcName] = funcName
 
-		interesting = true
+		// interesting = true
 		// fuzzer.Logf(0, "DGF: DEBUG: processResult: distance from %s to %s is %d",
 		// 	funcName, fuzzer.Config.Corpus.FocusAreas[0].DgfData.TargetFunction, d)
 	}
@@ -285,7 +301,7 @@ func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *
 
 	prio := signalPrio(p, info, call)
 	newMaxSignal := fuzzer.Cover.addRawMaxSignal(info.Signal, prio)
-	if newMaxSignal.Empty() && !interesting {
+	if newMaxSignal.Empty() {
 		// fuzzer.Logf(0, "DGF: function %s: newMaxSignal is %v and interesting is %v", funcName, newMaxSignal.Empty(), fuzzer.Config.Corpus.FocusAreas[0].DgfData.Interesting)
 		return false
 	}
@@ -297,6 +313,8 @@ func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *
 	if *triage == nil {
 		*triage = make(map[int]*triageCall)
 	}
+
+	// fmt.Printf("DGF: DEBUG funcName:%s, signal: %v\n", funcName, newMaxSignal)
 	(*triage)[call] = &triageCall{
 		errno:     info.Error,
 		newSignal: newMaxSignal,
