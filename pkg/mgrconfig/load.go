@@ -368,7 +368,6 @@ func (cfg *Config) completeFocusAreas() error {
 			seenEmptyFilter = true
 		}
 	}
-	fmt.Printf("cfg.Experimental.FocusAreas: %v\n", cfg.Experimental.FocusAreas)
 
 	if !cfg.CovFilter.Empty() {
 		if len(cfg.Experimental.FocusAreas) > 0 {

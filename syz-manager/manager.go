@@ -282,10 +282,12 @@ func RunManager(mode *Mode, cfg *mgrconfig.Config) {
 		crashes:            make(chan *manager.Crash, 10),
 		saturatedCalls:     make(map[string]bool),
 		reportGenerator:    manager.ReportGeneratorCache(cfg),
-		callGraphObj:       cfg.Experimental.DirectedGreyboxFuzzing.CallGraphObj,
 	}
 
-	cfg.Experimental.DirectedGreyboxFuzzing.CallGraphObj = nil
+	if cfg.Experimental.DirectedGreyboxFuzzing != nil {
+		mgr.callGraphObj = cfg.Experimental.DirectedGreyboxFuzzing.CallGraphObj
+		cfg.Experimental.DirectedGreyboxFuzzing.CallGraphObj = nil
+	}
 
 	if *flagDebug {
 		mgr.cfg.Procs = 1

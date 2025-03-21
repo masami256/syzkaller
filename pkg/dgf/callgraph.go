@@ -154,17 +154,12 @@ func containsNode(path []graph.Node, node graph.Node) bool {
 }
 
 // printPaths prints all paths in a readable format.
-func printPaths(paths [][]graph.Node, g *CallGraph) {
+func printPaths(paths [][]string) {
 	for _, path := range paths {
-		for i := len(path) - 1; i >= 0; i-- { // Reverse the path for printing source-to-target
-			for id, n := range g.NodeMap {
-				if n.ID() == path[i].ID() {
-					fmt.Print(id)
-					if i > 0 {
-						fmt.Print(" -> ")
-					}
-					break
-				}
+		for i, id := range path {
+			fmt.Print(id)
+			if i < len(path)-1 {
+				fmt.Print(" -> ")
 			}
 		}
 		fmt.Println()
