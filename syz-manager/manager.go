@@ -26,6 +26,7 @@ import (
 	"github.com/google/syzkaller/pkg/corpus"
 	"github.com/google/syzkaller/pkg/csource"
 	"github.com/google/syzkaller/pkg/db"
+	"github.com/google/syzkaller/pkg/dgf"
 	"github.com/google/syzkaller/pkg/flatrpc"
 	"github.com/google/syzkaller/pkg/fuzzer"
 	"github.com/google/syzkaller/pkg/fuzzer/queue"
@@ -110,6 +111,8 @@ type Manager struct {
 
 	reproLoop *manager.ReproLoop
 
+	// DGF: Impl
+	callGraphObj *dgf.CallGraph
 	Stats
 }
 
@@ -215,6 +218,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
+
 	if cfg.DashboardAddr != "" {
 		// This lets better distinguish logs of individual syz-manager instances.
 		log.SetName(cfg.Name)
@@ -278,7 +282,11 @@ func RunManager(mode *Mode, cfg *mgrconfig.Config) {
 		crashes:            make(chan *manager.Crash, 10),
 		saturatedCalls:     make(map[string]bool),
 		reportGenerator:    manager.ReportGeneratorCache(cfg),
+		callGraphObj:       cfg.Experimental.DirectedGreyboxFuzzing.CallGraphObj,
 	}
+
+	cfg.Experimental.DirectedGreyboxFuzzing.CallGraphObj = nil
+
 	if *flagDebug {
 		mgr.cfg.Procs = 1
 	}

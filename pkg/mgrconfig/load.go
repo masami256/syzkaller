@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/google/syzkaller/pkg/config"
+	"github.com/google/syzkaller/pkg/dgf"
 	"github.com/google/syzkaller/pkg/osutil"
 	"github.com/google/syzkaller/pkg/vminfo"
 	"github.com/google/syzkaller/prog"
@@ -198,6 +199,12 @@ func Complete(cfg *Config) error {
 	if err != nil {
 		return err
 	}
+
+	err = cfg.CompleteDirectedGreyboxFuzzing()
+	if err != nil {
+		return err
+	}
+
 	if err := cfg.completeFocusAreas(); err != nil {
 		return err
 	}
@@ -361,6 +368,8 @@ func (cfg *Config) completeFocusAreas() error {
 			seenEmptyFilter = true
 		}
 	}
+	fmt.Printf("cfg.Experimental.FocusAreas: %v\n", cfg.Experimental.FocusAreas)
+
 	if !cfg.CovFilter.Empty() {
 		if len(cfg.Experimental.FocusAreas) > 0 {
 			return fmt.Errorf("you cannot use both cov_filter and focus_areas")
@@ -374,6 +383,44 @@ func (cfg *Config) completeFocusAreas() error {
 		}
 		cfg.CovFilter = CovFilterCfg{}
 	}
+	return nil
+}
+
+func (cfg *Config) CompleteDirectedGreyboxFuzzing() error {
+	fmt.Printf("cfg.Experimental.DirectedGreyboxFuzzing: %v\n", cfg.Experimental.DirectedGreyboxFuzzing)
+	if cfg.Experimental.DirectedGreyboxFuzzing == nil {
+		return nil
+	}
+
+	callGraph, err := dgf.LoadCallGraph(cfg.Experimental.DirectedGreyboxFuzzing.CallGraphFile)
+	if err != nil {
+		return fmt.Errorf("failed to load call graph: %w", err)
+	}
+
+	functionList, _, err := dgf.FindShortestPaths(callGraph,
+		cfg.Experimental.DirectedGreyboxFuzzing.TargetFunction, 20)
+	if err != nil {
+		return fmt.Errorf("failed to find paths: %w", err)
+	}
+
+	functoins := dgf.StringMapToStringList(functionList)
+
+	cfg.CovFilter.Functions = dgf.CreateRegrepStrings(functoins)
+
+	cfg.Experimental.FocusAreas = []FocusArea{
+		{
+			Name:   "directed",
+			Filter: cfg.CovFilter,
+			Weight: 10.0,
+		},
+		{
+			Name:   "",
+			Weight: 0.1,
+		},
+	}
+	cfg.CovFilter = CovFilterCfg{}
+	cfg.Experimental.DirectedGreyboxFuzzing.CallGraphObj = callGraph
+
 	return nil
 }
 

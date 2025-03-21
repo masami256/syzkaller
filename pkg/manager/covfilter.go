@@ -139,6 +139,7 @@ type CoverageFilters struct {
 func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Config,
 	strict bool) (CoverageFilters, error) {
 	var ret CoverageFilters
+
 	needExecutorFilter := len(cfg.Experimental.FocusAreas) > 0
 	for _, area := range cfg.Experimental.FocusAreas {
 		pcs, err := CoverageFilter(source, area.Filter, strict)

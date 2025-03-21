@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/syzkaller/pkg/asset"
+	"github.com/google/syzkaller/pkg/dgf"
 )
 
 type Config struct {
@@ -255,6 +256,9 @@ type Experimental struct {
 	// with an empty Filter, but non-empty weight.
 	// E.g. "focus_areas": [ {"filter": {"files": ["^net"]}, "weight": 10.0}, {"weight": 1.0"} ].
 	FocusAreas []FocusArea `json:"focus_areas,omitempty"`
+
+	// DirectedGreyboxFuzzing configures the directed greybox fuzzing.
+	DirectedGreyboxFuzzing *DirectedGreyboxFuzzing `json:"directed_greybox_fuzzing,omitempty"`
 }
 
 type FocusArea struct {
@@ -286,4 +290,10 @@ type CovFilterCfg struct {
 	Files     []string `json:"files,omitempty"`
 	Functions []string `json:"functions,omitempty"`
 	RawPCs    []string `json:"pcs,omitempty"`
+}
+
+type DirectedGreyboxFuzzing struct {
+	TargetFunction string `json:"target_function"`
+	CallGraphFile  string `json:"call_graph_file"`
+	CallGraphObj   *dgf.CallGraph
 }
