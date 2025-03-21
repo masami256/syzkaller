@@ -279,25 +279,29 @@ func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *
 		return false
 	}
 
-	d, err := mgrconfig.CalculateShortestPath(fuzzer.Config.Corpus.FocusAreas[0].DgfData.CallGraph,
-		funcName, fuzzer.Config.Corpus.FocusAreas[0].DgfData.TargetFunction)
+	if funcName != "" {
+		d, err := mgrconfig.CalculateShortestPath(fuzzer.Config.Corpus.FocusAreas[0].DgfData.CallGraph,
+			funcName, fuzzer.Config.Corpus.FocusAreas[0].DgfData.TargetFunction)
 
-	if err != nil {
-		return false
+		if err != nil {
+			return false
+		}
+
+		if d < 10 && d <= fuzzer.Config.Corpus.FocusAreas[0].DgfData.PrevDistance {
+			fuzzer.Config.Corpus.FocusAreas[0].DgfData.PrevDistance = d
+
+			if _, ok := fuzzer.interestingFunctions[funcName]; !ok {
+				fuzzer.Logf(0, "DGF: DEBUG: processResult: Added interesting function %s: distance is %d", funcName, d)
+			}
+
+			fuzzer.interestingFunctions[funcName] = funcName
+
+			fuzzer.Config.Corpus.FocusAreas[0].DgfData.InterestingFunctions[funcName] = funcName
+		}
+		// else {
+		// 	return false
+		// }
 	}
-
-	if d < 10 && d <= fuzzer.Config.Corpus.FocusAreas[0].DgfData.PrevDistance {
-		fuzzer.Config.Corpus.FocusAreas[0].DgfData.PrevDistance = d
-
-		fuzzer.interestingFunctions[funcName] = funcName
-
-		// interesting = true
-		// fuzzer.Logf(0, "DGF: DEBUG: processResult: distance from %s to %s is %d",
-		// 	funcName, fuzzer.Config.Corpus.FocusAreas[0].DgfData.TargetFunction, d)
-	}
-	// else {
-	// 	return false
-	// }
 
 	prio := signalPrio(p, info, call)
 	newMaxSignal := fuzzer.Cover.addRawMaxSignal(info.Signal, prio)
@@ -306,7 +310,6 @@ func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *
 		return false
 	}
 	if !fuzzer.Config.NewInputFilter(p.CallName(call)) {
-		fuzzer.Logf(0, "DGF: function %s: NewInputFilter is false", funcName)
 		return false
 	}
 	//fuzzer.Logf(0, "found new signal/interesting in call %d in %s", call, p)
@@ -314,16 +317,10 @@ func (fuzzer *Fuzzer) triageProgCallForDGF(funcName string, p *prog.Prog, info *
 		*triage = make(map[int]*triageCall)
 	}
 
-	// fmt.Printf("DGF: DEBUG funcName:%s, signal: %v\n", funcName, newMaxSignal)
 	(*triage)[call] = &triageCall{
 		errno:     info.Error,
 		newSignal: newMaxSignal,
 		signals:   [deflakeNeedRuns]signal.Signal{signal.FromRaw(info.Signal, prio)},
-	}
-
-	if _, ok := fuzzer.Config.Corpus.FocusAreas[0].DgfData.InterestingFunctions[funcName]; !ok {
-		fuzzer.Config.Corpus.FocusAreas[0].DgfData.InterestingFunctions[funcName] = funcName
-		fuzzer.Logf(0, "DGF: DEBUG: processResult: Added interesting function %s: distance is %d", funcName, d)
 	}
 
 	return true
