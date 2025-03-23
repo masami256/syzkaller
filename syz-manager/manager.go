@@ -113,6 +113,7 @@ type Manager struct {
 
 	// DGF: Impl
 	callGraphObj *dgf.CallGraph
+	DGFMode      bool
 	Stats
 }
 
@@ -282,11 +283,13 @@ func RunManager(mode *Mode, cfg *mgrconfig.Config) {
 		crashes:            make(chan *manager.Crash, 10),
 		saturatedCalls:     make(map[string]bool),
 		reportGenerator:    manager.ReportGeneratorCache(cfg),
+		DGFMode:            false,
 	}
 
 	if cfg.Experimental.DirectedGreyboxFuzzing != nil {
 		mgr.callGraphObj = cfg.Experimental.DirectedGreyboxFuzzing.CallGraphObj
 		cfg.Experimental.DirectedGreyboxFuzzing.CallGraphObj = nil
+		mgr.DGFMode = true
 	}
 
 	if *flagDebug {
@@ -1137,6 +1140,11 @@ func (mgr *Manager) MachineChecked(features flatrpc.Feature,
 		corpusUpdates := make(chan corpus.NewItemEvent, 128)
 		mgr.corpus = corpus.NewFocusedCorpus(context.Background(),
 			corpusUpdates, mgr.coverFilters.Areas)
+		// DGF
+		if mgr.DGFMode {
+			mgr.corpus.CallGraphObj = mgr.callGraphObj
+			mgr.corpus.DGFMode = true
+		}
 		mgr.http.Corpus.Store(mgr.corpus)
 
 		rnd := rand.New(rand.NewSource(time.Now().UnixNano()))

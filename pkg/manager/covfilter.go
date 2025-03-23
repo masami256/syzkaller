@@ -18,39 +18,41 @@ import (
 )
 
 func CoverageFilter(source *ReportGeneratorWrapper, covCfg mgrconfig.CovFilterCfg,
-	strict bool) (map[uint64]struct{}, error) {
+	strict bool) (map[uint64]struct{}, map[uint64]string, error) {
 	if covCfg.Empty() {
-		return nil, nil
+		return nil, nil, nil
 	}
 	rg, err := source.Get()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	pcs := make(map[uint64]struct{})
+	functions := make(map[uint64]string)
+
 	foreachSymbol := func(apply func(*backend.ObjectUnit)) {
 		for _, sym := range rg.Symbols {
 			apply(&sym.ObjectUnit)
 		}
 	}
-	if err := covFilterAddFilter(pcs, covCfg.Functions, foreachSymbol, strict); err != nil {
-		return nil, err
+	if err := covFilterAddFilter(pcs, functions, covCfg.Functions, foreachSymbol, strict); err != nil {
+		return nil, nil, err
 	}
 	foreachUnit := func(apply func(*backend.ObjectUnit)) {
 		for _, unit := range rg.Units {
 			apply(&unit.ObjectUnit)
 		}
 	}
-	if err := covFilterAddFilter(pcs, covCfg.Files, foreachUnit, strict); err != nil {
-		return nil, err
+	if err := covFilterAddFilter(pcs, functions, covCfg.Files, foreachUnit, strict); err != nil {
+		return nil, nil, err
 	}
 	if err := covFilterAddRawPCs(pcs, covCfg.RawPCs); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// Note that pcs may include both comparison and block/edge coverage callbacks.
-	return pcs, nil
+	return pcs, functions, nil
 }
 
-func covFilterAddFilter(pcs map[uint64]struct{}, filters []string, foreach func(func(*backend.ObjectUnit)),
+func covFilterAddFilter(pcs map[uint64]struct{}, functions map[uint64]string, filters []string, foreach func(func(*backend.ObjectUnit)),
 	strict bool) error {
 	res, err := compileRegexps(filters)
 	if err != nil {
@@ -64,9 +66,11 @@ func covFilterAddFilter(pcs map[uint64]struct{}, filters []string, foreach func(
 				// because executor filters comparisons as well.
 				for _, pc := range unit.PCs {
 					pcs[pc] = struct{}{}
+					functions[pc] = unit.Name
 				}
 				for _, pc := range unit.CMPs {
 					pcs[pc] = struct{}{}
+					functions[pc] = unit.Name
 				}
 				used[re] = append(used[re], unit.Name)
 				break
@@ -142,7 +146,7 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 
 	needExecutorFilter := len(cfg.Experimental.FocusAreas) > 0
 	for _, area := range cfg.Experimental.FocusAreas {
-		pcs, err := CoverageFilter(source, area.Filter, strict)
+		pcs, functions_tmp, err := CoverageFilter(source, area.Filter, strict)
 		if err != nil {
 			return ret, err
 		}
@@ -152,10 +156,19 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 			next := backend.NextInstructionPC(cfg.SysTarget, cfg.Type, pc)
 			covPCs[next] = struct{}{}
 		}
+
+		functions := make(map[uint64]string)
+		for pc, name := range functions_tmp {
+			next := backend.NextInstructionPC(cfg.SysTarget, cfg.Type, pc)
+			functions[next] = name
+		}
+
+		// We need to adjust the functions map as well.
 		ret.Areas = append(ret.Areas, corpus.FocusArea{
-			Name:     area.Name,
-			CoverPCs: covPCs,
-			Weight:   area.Weight,
+			Name:      area.Name,
+			CoverPCs:  covPCs,
+			Weight:    area.Weight,
+			Functions: functions,
 		})
 		if area.Filter.Empty() {
 			// An empty cover filter indicates that the user is interested in all the coverage.

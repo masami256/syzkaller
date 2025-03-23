@@ -408,9 +408,10 @@ func (cfg *Config) CompleteDirectedGreyboxFuzzing() error {
 
 	cfg.Experimental.FocusAreas = []FocusArea{
 		{
-			Name:   "directed",
-			Filter: cfg.CovFilter,
-			Weight: 10.0,
+			Name:           "directed",
+			Filter:         cfg.CovFilter,
+			Weight:         10.0,
+			TargetFunction: cfg.Experimental.DirectedGreyboxFuzzing.TargetFunction,
 		},
 		{
 			Name:   "",

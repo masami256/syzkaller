@@ -440,6 +440,17 @@ func (fuzzer *Fuzzer) logCurrentStats() {
 }
 
 func setFlags(execFlags flatrpc.ExecFlag) flatrpc.ExecOpts {
+	// fmt.Printf("DGF: setFlags: execFlags:%v, ExecFlagCollectSignal %v, ExecFlagCollectComps: %v\n",
+	// 	execFlags, (execFlags & flatrpc.ExecFlagCollectSignal),
+	// 	(execFlags & flatrpc.ExecFlagCollectComps))
+
+	// DGF: Check flags because they are not used with ExecFlagDedupCover in a same time
+	if execFlags&flatrpc.ExecFlagCollectSignal == 0 && execFlags&flatrpc.ExecFlagCollectComps == 0 {
+		fmt.Printf("DGF: setFlags add ExecFlagCollectCover\n")
+		return flatrpc.ExecOpts{
+			ExecFlags: execFlags | flatrpc.ExecFlagCollectCover,
+		}
+	}
 	return flatrpc.ExecOpts{
 		ExecFlags: execFlags,
 	}

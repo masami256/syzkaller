@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/google/syzkaller/pkg/cover"
+	"github.com/google/syzkaller/pkg/dgf"
 	"github.com/google/syzkaller/pkg/hash"
 	"github.com/google/syzkaller/pkg/signal"
 	"github.com/google/syzkaller/pkg/stat"
@@ -32,6 +33,9 @@ type Corpus struct {
 	StatCover  *stat.Val
 
 	focusAreas []*focusAreaState
+
+	DGFMode      bool
+	CallGraphObj *dgf.CallGraph
 }
 
 type focusAreaState struct {
@@ -40,9 +44,11 @@ type focusAreaState struct {
 }
 
 type FocusArea struct {
-	Name     string // can be empty
-	CoverPCs map[uint64]struct{}
-	Weight   float64
+	Name           string // can be empty
+	CoverPCs       map[uint64]struct{}
+	Weight         float64
+	Functions      map[uint64]string
+	TargetFunction string
 }
 
 func NewCorpus(ctx context.Context) *Corpus {
@@ -158,7 +164,11 @@ func (corpus *Corpus) Save(inp NewInput) {
 			newItem.Updates = append(newItem.Updates, update)
 		}
 		corpus.progsMap[sig] = newItem
-		corpus.applyFocusAreas(newItem, inp.Cover)
+		if corpus.DGFMode {
+			corpus.applyFocusAreasForDGF(newItem, inp.RawCover)
+		} else {
+			corpus.applyFocusAreas(newItem, inp.Cover)
+		}
 	} else {
 		item := &Item{
 			Sig:     sig,
@@ -170,7 +180,11 @@ func (corpus *Corpus) Save(inp NewInput) {
 			Updates: []ItemUpdate{update},
 		}
 		corpus.progsMap[sig] = item
-		corpus.applyFocusAreas(item, inp.Cover)
+		if corpus.DGFMode {
+			corpus.applyFocusAreasForDGF(item, inp.RawCover)
+		} else {
+			corpus.applyFocusAreas(item, inp.Cover)
+		}
 		corpus.saveProgram(inp.Prog, inp.Signal)
 	}
 	corpus.signal.Merge(inp.Signal)
@@ -184,6 +198,47 @@ func (corpus *Corpus) Save(inp NewInput) {
 			ProgData: progData,
 			NewCover: newCover,
 		}:
+		}
+	}
+}
+
+func (corpus *Corpus) applyFocusAreasForDGF(item *Item, coverDelta []uint64) {
+	fmt.Printf("DGF applyFocusAreasForDGF is called: focusAreas length is %d\n", len(corpus.focusAreas))
+	for _, area := range corpus.focusAreas {
+		matches := false
+		fmt.Printf("DGF: CoverDelta length is %d\n", len(coverDelta))
+		for _, pc := range coverDelta {
+			if _, ok := area.Functions[pc]; ok {
+				d, err := dgf.CalculateShortestPath(corpus.CallGraphObj, area.Functions[pc], area.TargetFunction)
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+
+				fmt.Printf("DGF: Found function %s in the corpus. Length to target function is %d\n", area.Functions[pc], d)
+
+				if d < 10 {
+					fmt.Printf("DGF: Adding function %s lenght(%d) to the corpus\n", area.Functions[pc], d)
+					if _, ok := area.CoverPCs[pc]; ok {
+						matches = true
+						break
+					}
+				}
+			} else {
+				if _, ok := area.CoverPCs[pc]; ok {
+					matches = true
+					break
+				}
+			}
+		}
+
+		if !matches {
+			continue
+		}
+		area.saveProgram(item.Prog, item.Signal)
+		if item.areas == nil {
+			item.areas = make(map[*focusAreaState]struct{})
+			item.areas[area] = struct{}{}
 		}
 	}
 }

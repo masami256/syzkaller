@@ -279,6 +279,9 @@ type FocusArea struct {
 
 	// Weight is a positive number that determines how much focus should be put on this area.
 	Weight float64 `json:"weight"`
+
+	// DGF
+	TargetFunction string
 }
 
 type Subsystem struct {
