@@ -137,6 +137,10 @@ func (job *triageJob) execute(req *queue.Request, flags ProgFlags) *queue.Result
 }
 
 func (job *triageJob) run(fuzzer *Fuzzer) {
+	// buf := make([]byte, 1024)
+	// n := runtime.Stack(buf, false)
+	// fmt.Printf("triageJob.run: stack trace: %s\n", string(buf[:n]))
+
 	fuzzer.statNewInputs.Add(1)
 	job.fuzzer = fuzzer
 	job.info.Logf("\n%s", job.p.Serialize())

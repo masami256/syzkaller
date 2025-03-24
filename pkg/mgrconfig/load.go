@@ -386,7 +386,6 @@ func (cfg *Config) completeFocusAreas() error {
 }
 
 func (cfg *Config) CompleteDirectedGreyboxFuzzing() error {
-	fmt.Printf("cfg.Experimental.DirectedGreyboxFuzzing: %v\n", cfg.Experimental.DirectedGreyboxFuzzing)
 	if cfg.Experimental.DirectedGreyboxFuzzing == nil {
 		return nil
 	}

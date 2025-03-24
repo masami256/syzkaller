@@ -1144,6 +1144,7 @@ func (mgr *Manager) MachineChecked(features flatrpc.Feature,
 		if mgr.DGFMode {
 			mgr.corpus.CallGraphObj = mgr.callGraphObj
 			mgr.corpus.DGFMode = true
+			mgr.corpus.FocusAreas[0].TargetFunction = mgr.cfg.Experimental.DirectedGreyboxFuzzing.TargetFunction
 		}
 		mgr.http.Corpus.Store(mgr.corpus)
 

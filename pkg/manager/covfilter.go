@@ -165,10 +165,10 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 
 		// We need to adjust the functions map as well.
 		ret.Areas = append(ret.Areas, corpus.FocusArea{
-			Name:      area.Name,
-			CoverPCs:  covPCs,
-			Weight:    area.Weight,
-			Functions: functions,
+			Name:          area.Name,
+			CoverPCs:      covPCs,
+			Weight:        area.Weight,
+			FunctionNames: functions,
 		})
 		if area.Filter.Empty() {
 			// An empty cover filter indicates that the user is interested in all the coverage.

@@ -32,7 +32,7 @@ type Corpus struct {
 	StatSignal *stat.Val
 	StatCover  *stat.Val
 
-	focusAreas []*focusAreaState
+	FocusAreas []*focusAreaState
 
 	DGFMode      bool
 	CallGraphObj *dgf.CallGraph
@@ -47,7 +47,7 @@ type FocusArea struct {
 	Name           string // can be empty
 	CoverPCs       map[uint64]struct{}
 	Weight         float64
-	Functions      map[uint64]string
+	FunctionNames  map[uint64]string
 	TargetFunction string
 }
 
@@ -81,7 +81,7 @@ func NewFocusedCorpus(ctx context.Context, updates chan<- NewItemEvent, areas []
 				stat.Console, stat.Graph("corpus"),
 				stat.LenOf(&obj.progs, &corpus.mu))
 		}
-		corpus.focusAreas = append(corpus.focusAreas, &focusAreaState{
+		corpus.FocusAreas = append(corpus.FocusAreas, &focusAreaState{
 			FocusArea:    area,
 			ProgramsList: obj,
 		})
@@ -165,7 +165,7 @@ func (corpus *Corpus) Save(inp NewInput) {
 		}
 		corpus.progsMap[sig] = newItem
 		if corpus.DGFMode {
-			corpus.applyFocusAreasForDGF(newItem, inp.RawCover)
+			corpus.applyFocusAreasForDGF(newItem, inp.Cover)
 		} else {
 			corpus.applyFocusAreas(newItem, inp.Cover)
 		}
@@ -181,7 +181,7 @@ func (corpus *Corpus) Save(inp NewInput) {
 		}
 		corpus.progsMap[sig] = item
 		if corpus.DGFMode {
-			corpus.applyFocusAreasForDGF(item, inp.RawCover)
+			corpus.applyFocusAreasForDGF(item, inp.Cover)
 		} else {
 			corpus.applyFocusAreas(item, inp.Cover)
 		}
@@ -203,31 +203,31 @@ func (corpus *Corpus) Save(inp NewInput) {
 }
 
 func (corpus *Corpus) applyFocusAreasForDGF(item *Item, coverDelta []uint64) {
-	fmt.Printf("DGF applyFocusAreasForDGF is called: focusAreas length is %d\n", len(corpus.focusAreas))
-	for _, area := range corpus.focusAreas {
+	// fmt.Printf("DGF: applyFocusAreasForDGF() is called: coverDelta length is %d\n", len(coverDelta))
+	for _, area := range corpus.FocusAreas {
 		matches := false
-		fmt.Printf("DGF: CoverDelta length is %d\n", len(coverDelta))
+		var nearlestDistance int = 1000
+		var nearlestFunction string
+
 		for _, pc := range coverDelta {
-			if _, ok := area.Functions[pc]; ok {
-				d, err := dgf.CalculateShortestPath(corpus.CallGraphObj, area.Functions[pc], area.TargetFunction)
+			// fmt.Printf("DGF: applyFocusAreasForDGF(): check pc 0x%x\n", pc)
+
+			if _, ok := area.FunctionNames[pc]; ok {
+				fmt.Printf("DGF: applyFocusAreasForDGF(): find function %s\n", area.FunctionNames[pc])
+				d, err := dgf.CalculateShortestPath(corpus.CallGraphObj, area.FunctionNames[pc], area.TargetFunction)
 				if err != nil {
 					fmt.Println(err)
 					continue
 				}
 
-				fmt.Printf("DGF: Found function %s in the corpus. Length to target function is %d\n", area.Functions[pc], d)
-
 				if d < 10 {
-					fmt.Printf("DGF: Adding function %s lenght(%d) to the corpus\n", area.Functions[pc], d)
-					if _, ok := area.CoverPCs[pc]; ok {
-						matches = true
-						break
+					if d < nearlestDistance {
+						if _, ok := area.CoverPCs[pc]; ok {
+							matches = true
+							nearlestDistance = d
+							nearlestFunction = area.FunctionNames[pc]
+						}
 					}
-				}
-			} else {
-				if _, ok := area.CoverPCs[pc]; ok {
-					matches = true
-					break
 				}
 			}
 		}
@@ -235,6 +235,9 @@ func (corpus *Corpus) applyFocusAreasForDGF(item *Item, coverDelta []uint64) {
 		if !matches {
 			continue
 		}
+
+		fmt.Printf("DGF: applyFocusAreasForDGF(): Save item:  function %s lenght(%d) to the corpus\n", nearlestFunction, nearlestDistance)
+
 		area.saveProgram(item.Prog, item.Signal)
 		if item.areas == nil {
 			item.areas = make(map[*focusAreaState]struct{})
@@ -244,7 +247,7 @@ func (corpus *Corpus) applyFocusAreasForDGF(item *Item, coverDelta []uint64) {
 }
 
 func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) {
-	for _, area := range corpus.focusAreas {
+	for _, area := range corpus.FocusAreas {
 		matches := false
 		for _, pc := range coverDelta {
 			if _, ok := area.CoverPCs[pc]; ok {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/syzkaller/pkg/corpus"
 	"github.com/google/syzkaller/pkg/csource"
+	"github.com/google/syzkaller/pkg/dgf"
 	"github.com/google/syzkaller/pkg/flatrpc"
 	"github.com/google/syzkaller/pkg/fuzzer/queue"
 	"github.com/google/syzkaller/pkg/mgrconfig"
@@ -142,6 +143,9 @@ func (fuzzer *Fuzzer) processResult(req *queue.Request, res *queue.Result, flags
 		for call, info := range res.Info.Calls {
 			fuzzer.triageProgCall(req.Prog, info, call, &triage)
 		}
+
+		fuzzer.triageCoverage(req.Prog, res.Info, &triage)
+
 		fuzzer.triageProgCall(req.Prog, res.Info.Extra, -1, &triage)
 
 		if len(triage) != 0 {
@@ -235,6 +239,62 @@ func (fuzzer *Fuzzer) triageProgCall(p *prog.Prog, info *flatrpc.CallInfo, call 
 	}
 }
 
+func (fuzzer *Fuzzer) triageCoverage(p *prog.Prog, info *flatrpc.ProgInfo, triage *map[int]*triageCall) {
+	if info == nil {
+		return
+	}
+
+	var nealestCall int
+	var tmpInfo *flatrpc.CallInfoRawT
+	var lastDistance int = 1000
+
+	for call, infort := range info.Calls {
+		if _, ok := (*triage)[call]; ok {
+			// fmt.Printf("DGF: triageCoverage: call %d already in triage\n", call)
+			continue
+		}
+
+		for _, pc := range infort.Cover {
+			if reachedFunction, ok := fuzzer.Config.Corpus.FocusAreas[0].FunctionNames[pc]; ok {
+				d, err := dgf.CalculateShortestPath(fuzzer.Config.Corpus.CallGraphObj,
+					reachedFunction, fuzzer.Config.Corpus.FocusAreas[0].TargetFunction)
+
+				if err != nil {
+					// fmt.Println(err)
+					continue
+				}
+
+				if d < 10 {
+					if d < lastDistance {
+						fmt.Printf("DGF: triageCoverage(): Adding function %s length(%d) to the corpus\n", reachedFunction, d)
+						lastDistance = d
+						nealestCall = call
+						tmpInfo = infort
+					}
+				}
+				// 	// 	// fuzzer.mu.Lock()
+				// 	// 	// fuzzer.mu.Unlock()
+			}
+		}
+	}
+
+	if nealestCall == 0 {
+		return
+	}
+
+	if *triage == nil {
+		*triage = make(map[int]*triageCall)
+	}
+
+	prio := signalPrio(p, tmpInfo, nealestCall)
+	(*triage)[nealestCall] = &triageCall{
+		errno:     0,
+		newSignal: fuzzer.Cover.addRawMaxSignal(tmpInfo.Signal, prio),
+		signals:   [deflakeNeedRuns]signal.Signal{signal.FromRaw(tmpInfo.Signal, prio)},
+	}
+
+}
+
 func (fuzzer *Fuzzer) handleCallInfo(req *queue.Request, info *flatrpc.CallInfo, call int) {
 	if info == nil || info.Flags&flatrpc.CallFlagCoverageOverflow == 0 {
 		return
@@ -291,6 +351,10 @@ func (fuzzer *Fuzzer) genFuzz() *queue.Request {
 }
 
 func (fuzzer *Fuzzer) startJob(stat *stat.Val, newJob job) {
+	// buf := make([]byte, 1024)
+	// n := runtime.Stack(buf, false)
+	// fmt.Printf("startJob: stack trace: %s\n", string(buf[:n]))
+
 	fuzzer.Logf(2, "started %T", newJob)
 	go func() {
 		stat.Add(1)
@@ -445,10 +509,9 @@ func setFlags(execFlags flatrpc.ExecFlag) flatrpc.ExecOpts {
 	// 	(execFlags & flatrpc.ExecFlagCollectComps))
 
 	// DGF: Check flags because they are not used with ExecFlagDedupCover in a same time
-	if execFlags&flatrpc.ExecFlagCollectSignal == 0 && execFlags&flatrpc.ExecFlagCollectComps == 0 {
-		fmt.Printf("DGF: setFlags add ExecFlagCollectCover\n")
+	if execFlags&flatrpc.ExecFlagCollectComps == 0 {
 		return flatrpc.ExecOpts{
-			ExecFlags: execFlags | flatrpc.ExecFlagCollectCover,
+			ExecFlags: execFlags | flatrpc.ExecFlagCollectCover | flatrpc.ExecFlagDedupCover,
 		}
 	}
 	return flatrpc.ExecOpts{
