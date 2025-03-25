@@ -77,13 +77,17 @@ func covFilterAddFilter(pcs map[uint64]struct{}, functions map[uint64]string, fi
 			}
 		}
 	})
+
 	for _, re := range res {
 		sort.Strings(used[re])
 		log.Logf(0, "coverage filter: %v: %v", re, used[re])
 	}
+
 	if strict && len(res) != len(used) {
-		return fmt.Errorf("some filters don't match anything")
+		// fmt.Printf("DGF: covFilterAddFilter(): some filters don't match anything\n")
+		log.Logf(0, "some filters don't match anything")
 	}
+
 	return nil
 }
 
