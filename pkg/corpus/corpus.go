@@ -203,40 +203,27 @@ func (corpus *Corpus) Save(inp NewInput) {
 }
 
 func (corpus *Corpus) applyFocusAreasForDGF(item *Item, coverDelta []uint64) {
-	// fmt.Printf("DGF: applyFocusAreasForDGF() is called: coverDelta length is %d\n", len(coverDelta))
 	for _, area := range corpus.FocusAreas {
+		var reachedFunction string
 		matches := false
-		var nearlestDistance int = 1000
-		var nearlestFunction string
-
 		for _, pc := range coverDelta {
-			// fmt.Printf("DGF: applyFocusAreasForDGF(): check pc 0x%x\n", pc)
-
-			if _, ok := area.FunctionNames[pc]; ok {
-				fmt.Printf("DGF: applyFocusAreasForDGF(): find function %s\n", area.FunctionNames[pc])
-				d, err := dgf.CalculateShortestPath(corpus.CallGraphObj, area.FunctionNames[pc], area.TargetFunction)
-				if err != nil {
-					fmt.Println(err)
-					continue
-				}
-
-				if d < 10 {
-					if d < nearlestDistance {
-						if _, ok := area.CoverPCs[pc]; ok {
-							matches = true
-							nearlestDistance = d
-							nearlestFunction = area.FunctionNames[pc]
-						}
+			if _, ok := area.CoverPCs[pc]; ok {
+				matches = true
+				if _, ok := area.FunctionNames[pc]; ok {
+					reachedFunction = area.FunctionNames[pc]
+					if reachedFunction == area.TargetFunction {
+						fmt.Printf("DGF: applyFocusAreasForDGF(): Target function %s reached\n", reachedFunction)
+						break
 					}
 				}
+				// break
 			}
 		}
-
 		if !matches {
 			continue
 		}
 
-		fmt.Printf("DGF: applyFocusAreasForDGF(): Save item:  function %s lenght(%d) to the corpus\n", nearlestFunction, nearlestDistance)
+		fmt.Printf("DGF: applyFocusAreasForDGF(): Add function %s\n", reachedFunction)
 
 		area.saveProgram(item.Prog, item.Signal)
 		if item.areas == nil {
@@ -247,6 +234,7 @@ func (corpus *Corpus) applyFocusAreasForDGF(item *Item, coverDelta []uint64) {
 }
 
 func (corpus *Corpus) applyFocusAreas(item *Item, coverDelta []uint64) {
+	fmt.Printf("DGF: default applyFocusAreas(): is called\n")
 	for _, area := range corpus.FocusAreas {
 		matches := false
 		for _, pc := range coverDelta {

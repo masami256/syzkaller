@@ -232,6 +232,7 @@ func (fuzzer *Fuzzer) triageProgCall(p *prog.Prog, info *flatrpc.CallInfo, call 
 	if *triage == nil {
 		*triage = make(map[int]*triageCall)
 	}
+
 	(*triage)[call] = &triageCall{
 		errno:     info.Error,
 		newSignal: newMaxSignal,
@@ -239,23 +240,24 @@ func (fuzzer *Fuzzer) triageProgCall(p *prog.Prog, info *flatrpc.CallInfo, call 
 	}
 }
 
-func (fuzzer *Fuzzer) triageCoverage(p *prog.Prog, info *flatrpc.ProgInfo, triage *map[int]*triageCall) {
-	if info == nil {
+func (fuzzer *Fuzzer) triageCoverage(p *prog.Prog, proginfo *flatrpc.ProgInfo, triage *map[int]*triageCall) {
+	if proginfo == nil {
 		return
 	}
 
-	var nealestCall int
+	var nealestCall int = -1
 	var tmpInfo *flatrpc.CallInfoRawT
 	var lastDistance int = 1000
+	var reachedFunction string
 
-	for call, infort := range info.Calls {
-		if _, ok := (*triage)[call]; ok {
-			// fmt.Printf("DGF: triageCoverage: call %d already in triage\n", call)
-			continue
-		}
+	for call, info := range proginfo.Calls {
+		// if _, ok := (*triage)[call]; ok {
+		// 	// fmt.Printf("DGF: triageCoverage: call %d already in triage\n", call)
+		// 	continue
+		// }
 
-		for _, pc := range infort.Cover {
-			if reachedFunction, ok := fuzzer.Config.Corpus.FocusAreas[0].FunctionNames[pc]; ok {
+		for _, pc := range info.Cover {
+			if funcName, ok := fuzzer.Config.Corpus.FocusAreas[0].FunctionNames[pc]; ok {
 				d, err := dgf.CalculateShortestPath(fuzzer.Config.Corpus.CallGraphObj,
 					reachedFunction, fuzzer.Config.Corpus.FocusAreas[0].TargetFunction)
 
@@ -266,10 +268,13 @@ func (fuzzer *Fuzzer) triageCoverage(p *prog.Prog, info *flatrpc.ProgInfo, triag
 
 				if d < 10 {
 					if d < lastDistance {
-						fmt.Printf("DGF: triageCoverage(): Adding function %s length(%d) to the corpus\n", reachedFunction, d)
+						reachedFunction = funcName
 						lastDistance = d
 						nealestCall = call
-						tmpInfo = infort
+						tmpInfo = info
+						if lastDistance == 0 {
+							break
+						}
 					}
 				}
 				// 	// 	// fuzzer.mu.Lock()
@@ -278,13 +283,20 @@ func (fuzzer *Fuzzer) triageCoverage(p *prog.Prog, info *flatrpc.ProgInfo, triag
 		}
 	}
 
-	if nealestCall == 0 {
+	if nealestCall == -1 {
 		return
 	}
 
 	if *triage == nil {
 		*triage = make(map[int]*triageCall)
 	}
+
+	if _, ok := (*triage)[nealestCall]; ok {
+		fmt.Printf("DGF: triageProgCall: call %d already in triage\n", nealestCall)
+		// return
+	}
+
+	fmt.Printf("DGF: triageCoverage(): Adding function %s length(%d) to the corpus\n", reachedFunction, lastDistance)
 
 	prio := signalPrio(p, tmpInfo, nealestCall)
 	(*triage)[nealestCall] = &triageCall{
@@ -325,6 +337,10 @@ func signalPrio(p *prog.Prog, info *flatrpc.CallInfo, call int) (prio uint8) {
 }
 
 func (fuzzer *Fuzzer) genFuzz() *queue.Request {
+	if fuzzer.Config.Corpus.DGFMode {
+		return fuzzer.genFuzzForDGF()
+	}
+
 	// Either generate a new input or mutate an existing one.
 	mutateRate := 0.95
 	if !fuzzer.Config.Coverage {
@@ -350,6 +366,32 @@ func (fuzzer *Fuzzer) genFuzz() *queue.Request {
 	return req
 }
 
+func (fuzzer *Fuzzer) genFuzzForDGF() *queue.Request {
+	fmt.Printf("DGF: genFuzzForDGF() is called\n")
+	// Either generate a new input or mutate an existing one.
+	mutateRate := 0.95
+	if !fuzzer.Config.Coverage {
+		// If we don't have real coverage signal, generate programs
+		// more frequently because fallback signal is weak.
+		mutateRate = 0.5
+	}
+	var req *queue.Request
+	rnd := fuzzer.rand()
+	if rnd.Float64() < mutateRate {
+		req = mutateProgRequest(fuzzer, rnd)
+	}
+	if req == nil {
+		req = genProgRequest(fuzzer, rnd)
+	}
+	if fuzzer.Config.Collide && rnd.Intn(3) == 0 {
+		req = &queue.Request{
+			Prog: randomCollide(req.Prog, rnd),
+			Stat: fuzzer.statExecCollide,
+		}
+	}
+	fuzzer.prepare(req, 0, 0)
+	return req
+}
 func (fuzzer *Fuzzer) startJob(stat *stat.Val, newJob job) {
 	// buf := make([]byte, 1024)
 	// n := runtime.Stack(buf, false)
@@ -510,8 +552,9 @@ func setFlags(execFlags flatrpc.ExecFlag) flatrpc.ExecOpts {
 
 	// DGF: Check flags because they are not used with ExecFlagDedupCover in a same time
 	if execFlags&flatrpc.ExecFlagCollectComps == 0 {
+
 		return flatrpc.ExecOpts{
-			ExecFlags: execFlags | flatrpc.ExecFlagCollectCover | flatrpc.ExecFlagDedupCover,
+			ExecFlags: execFlags | flatrpc.ExecFlagDedupCover,
 		}
 	}
 	return flatrpc.ExecOpts{

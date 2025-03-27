@@ -396,14 +396,16 @@ func (cfg *Config) CompleteDirectedGreyboxFuzzing() error {
 	}
 
 	functionList, _, err := dgf.FindShortestPaths(callGraph,
-		cfg.Experimental.DirectedGreyboxFuzzing.TargetFunction, 20)
+		cfg.Experimental.DirectedGreyboxFuzzing.TargetFunction, 3)
 	if err != nil {
 		return fmt.Errorf("failed to find paths: %w", err)
 	}
 
-	functoins := dgf.StringMapToStringList(functionList)
+	functions := dgf.StringMapToStringList(functionList)
 
-	cfg.CovFilter.Functions = dgf.CreateRegrepStrings(functoins)
+	// functions = []string{"ext4_search_dir"}
+
+	cfg.CovFilter.Functions = dgf.CreateRegrepStrings(functions)
 
 	cfg.Experimental.FocusAreas = []FocusArea{
 		{
