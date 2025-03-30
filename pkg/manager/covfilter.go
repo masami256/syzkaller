@@ -158,22 +158,22 @@ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Confi
 		covPCs := make(map[uint64]struct{})
 		for pc := range pcs {
 			next := backend.NextInstructionPC(cfg.SysTarget, cfg.Type, pc)
-			fmt.Printf("DGF: DEBUG: PrepareCoverageFilters:pcs:  pc: 0x%x, next: 0x%x\n", pc, next)
+			// fmt.Printf("DGF: DEBUG: PrepareCoverageFilters:pcs:  pc: 0x%x, next: 0x%x\n", pc, next)
 			covPCs[next] = struct{}{}
 		}
 
 		functions := make(map[uint64]string)
 		for pc, name := range functions_tmp {
 			next := backend.NextInstructionPC(cfg.SysTarget, cfg.Type, pc)
-			fmt.Printf("DGF: DEBUG: PrepareCoverageFilters:functions:  pc: 0x%x, next: 0x%x\n", pc, next)
+			// fmt.Printf("DGF: DEBUG: PrepareCoverageFilters:functions:  pc: 0x%x, next: 0x%x\n", pc, next)
 			functions[next] = name
 		}
 
-		fmt.Printf("DGF: DEBUG PrepareCoverageFilters(): functions:\n")
-		for pc, name := range functions {
-			fmt.Printf("DGF: DEBUG PrepareCoverageFilters(): pc: 0x%x, name: %s\n", pc, name)
-		}
-		fmt.Printf("===============================\n")
+		// fmt.Printf("DGF: DEBUG PrepareCoverageFilters(): functions:\n")
+		// for pc, name := range functions {
+		// 	fmt.Printf("DGF: DEBUG PrepareCoverageFilters(): pc: 0x%x, name: %s\n", pc, name)
+		// }
+		// fmt.Printf("===============================\n")
 
 		// We need to adjust the functions map as well.
 		ret.Areas = append(ret.Areas, corpus.FocusArea{

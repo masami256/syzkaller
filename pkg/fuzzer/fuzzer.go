@@ -96,6 +96,10 @@ func newExecQueues(fuzzer *Fuzzer) execQueues {
 		// mutating various corpus programs.
 		skipQueue = 2
 	}
+	if fuzzer.Config.Corpus.DGFMode {
+		skipQueue = 2
+		fmt.Printf("DGF: newExecQueues: DGFMode is enabled\n")
+	}
 	// Sources are listed in the order, in which they will be polled.
 	ret.source = queue.Order(
 		ret.triageCandidateQueue,
@@ -139,6 +143,7 @@ func (fuzzer *Fuzzer) processResult(req *queue.Request, res *queue.Result, flags
 	// We do it before unblocking the waiting threads because
 	// it may result it concurrent modification of req.Prog.
 	var triage map[int]*triageCall
+
 	if req.ExecOpts.ExecFlags&flatrpc.ExecFlagCollectSignal > 0 && res.Info != nil && !dontTriage {
 		for call, info := range res.Info.Calls {
 			fuzzer.triageProgCall(req.Prog, info, call, &triage)
@@ -247,15 +252,10 @@ func (fuzzer *Fuzzer) triageCoverage(p *prog.Prog, proginfo *flatrpc.ProgInfo, t
 
 	var nealestCall int = -1
 	var tmpInfo *flatrpc.CallInfoRawT
-	var lastDistance int = 1000
+	var prevDistance int = 1000
 	var reachedFunction string
 
 	for call, info := range proginfo.Calls {
-		// if _, ok := (*triage)[call]; ok {
-		// 	// fmt.Printf("DGF: triageCoverage: call %d already in triage\n", call)
-		// 	continue
-		// }
-
 		for _, pc := range info.Cover {
 			if funcName, ok := fuzzer.Config.Corpus.FocusAreas[0].FunctionNames[pc]; ok {
 				d, err := dgf.CalculateShortestPath(fuzzer.Config.Corpus.CallGraphObj,
@@ -267,23 +267,25 @@ func (fuzzer *Fuzzer) triageCoverage(p *prog.Prog, proginfo *flatrpc.ProgInfo, t
 				}
 
 				if d < 10 {
-					if d < lastDistance {
+					if d < prevDistance {
 						reachedFunction = funcName
-						lastDistance = d
+						prevDistance = d
 						nealestCall = call
 						tmpInfo = info
-						if lastDistance == 0 {
+						if prevDistance == 0 {
 							break
 						}
 					}
 				}
-				// 	// 	// fuzzer.mu.Lock()
-				// 	// 	// fuzzer.mu.Unlock()
 			}
 		}
 	}
 
 	if nealestCall == -1 {
+		return
+	}
+
+	if prevDistance >= 10 {
 		return
 	}
 
@@ -296,7 +298,7 @@ func (fuzzer *Fuzzer) triageCoverage(p *prog.Prog, proginfo *flatrpc.ProgInfo, t
 		// return
 	}
 
-	fmt.Printf("DGF: triageCoverage(): Adding function %s length(%d) to the corpus\n", reachedFunction, lastDistance)
+	fmt.Printf("DGF: triageCoverage(): Adding function %s length(%d) to the corpus\n", reachedFunction, prevDistance)
 
 	prio := signalPrio(p, tmpInfo, nealestCall)
 	(*triage)[nealestCall] = &triageCall{
@@ -304,7 +306,6 @@ func (fuzzer *Fuzzer) triageCoverage(p *prog.Prog, proginfo *flatrpc.ProgInfo, t
 		newSignal: fuzzer.Cover.addRawMaxSignal(tmpInfo.Signal, prio),
 		signals:   [deflakeNeedRuns]signal.Signal{signal.FromRaw(tmpInfo.Signal, prio)},
 	}
-
 }
 
 func (fuzzer *Fuzzer) handleCallInfo(req *queue.Request, info *flatrpc.CallInfo, call int) {
@@ -367,7 +368,6 @@ func (fuzzer *Fuzzer) genFuzz() *queue.Request {
 }
 
 func (fuzzer *Fuzzer) genFuzzForDGF() *queue.Request {
-	fmt.Printf("DGF: genFuzzForDGF() is called\n")
 	// Either generate a new input or mutate an existing one.
 	mutateRate := 0.95
 	if !fuzzer.Config.Coverage {

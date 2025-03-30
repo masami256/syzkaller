@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 	"sync"
+	"time"
 
 	"github.com/google/syzkaller/pkg/cover"
 	"github.com/google/syzkaller/pkg/dgf"
@@ -36,6 +37,7 @@ type Corpus struct {
 
 	DGFMode      bool
 	CallGraphObj *dgf.CallGraph
+	StartTime    time.Time
 }
 
 type focusAreaState struct {
